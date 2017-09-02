@@ -1,0 +1,56 @@
+{
+    "name": "vscode-proxy",
+    "displayName": "Proxy",
+    "description": "Run TCP proxies with additional trace support.",
+    "version": "0.0.1",
+    "publisher": "mkloubert",
+    "engines": {
+        "vscode": "^1.13.0"
+    },
+    "license": "MIT",
+    "categories": [
+        "Other"
+    ],
+    "keywords": [
+        "TCP",
+        "Proxy",
+        "Network",
+        "Trace",
+        "HTTP"
+    ],
+    "activationEvents": [
+        "*"
+    ],
+    "main": "./out/src/extension",
+    "contributes": {
+        "commands": []
+    },
+    "icon": "icon.png",
+    "author": {
+        "name": "Marcel Joachim Kloubert"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/mkloubert/vscode-proxy"
+    },
+    "bugs": {
+        "url": "https://github.com/mkloubert/vscode-proxy/issues"
+    },
+    "readmeFilename": "README.md",
+    "scripts": {
+        "vscode:prepublish": "tsc -p ./",
+        "compile": "tsc -watch -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "test": "node ./node_modules/vscode/bin/test"
+    },
+    "devDependencies": {
+        "typescript": "^2.0.3",
+        "vscode": "^1.0.0",
+        "mocha": "^2.3.3",
+        "@types/node": "^6.0.40",
+        "@types/mocha": "^2.2.32"
+    },
+    "dependencies": {
+        "moment": "^2.18.1"
+    }
+}
