@@ -25,6 +25,25 @@ import * as vscode from 'vscode';
 
 
 /**
+ * A quick pick item based on an action.
+ */
+export interface ActionQuickPickItem<TState = any> extends vscode.QuickPickItem {
+    /**
+     * The action.
+     * 
+     * @param {TState} state The value from 'state' property.
+     * @param {ActionQuickPickItem} item The underlying object.
+     * 
+     * @return {any} The result.
+     */
+    readonly action?: (state: TState, item: ActionQuickPickItem) => any;
+    /**
+     * The value for the 1st argument of the action.
+     */
+    readonly state?: TState;
+}
+
+/**
  * Extension settings.
  */
 export interface Configuration extends vscode.WorkspaceConfiguration {
@@ -56,4 +75,29 @@ export interface PackageFile {
  * A proxy entry.
  */
 export interface ProxyEntry {
+    /**
+     * Start proxy on startup or not.
+     */
+    readonly autoStart?: boolean;
+    /**
+     * An additional description for the proxy.
+     */
+    readonly description?: string;
+    /**
+     * The name of the proxy.
+     */
+    readonly name?: string;
+    /**
+     * The source port.
+     */
+    readonly port?: number;
+    /**
+     * The destination port(s) or address(es).
+     */
+    readonly to?: ProxyTarget | ProxyTarget[];
 }
+
+/**
+ * A proxy target.
+ */
+export type ProxyTarget = string | number;

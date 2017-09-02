@@ -1,8 +1,8 @@
 {
     "name": "vscode-proxy",
     "displayName": "Proxy",
-    "description": "Run TCP proxies with additional trace support.",
-    "version": "0.0.1",
+    "description": "Runs TCP proxies with additional trace support.",
+    "version": "0.1.0",
     "publisher": "mkloubert",
     "engines": {
         "vscode": "^1.13.0"
@@ -23,7 +23,15 @@
     ],
     "main": "./out/src/extension",
     "contributes": {
-        "commands": []
+        "commands": [{
+            "command": "extension.proxy.startStop",
+            "title": "Start / stop",
+            "category": "Proxy"
+        },{
+            "command": "extension.proxy.trace",
+            "title": "Trace",
+            "category": "Proxy"
+        }]
     },
     "icon": "icon.png",
     "author": {
