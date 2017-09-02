@@ -30,8 +30,48 @@ import * as vsp_helpers from './helpers';
 
 
 interface EntryWithSocket {
-    readonly entry: vsp_contracts.ProxyEntry;
+    readonly entry: { host: string; port: number; };
     readonly socket: Net.Socket;
+}
+
+/**
+ * A socket address.
+ */
+export interface SocketAddress {
+    /**
+     * The (local) address.
+     */
+    readonly addr: string;
+    /**
+     * The (local) TCP port.
+     */
+    readonly port: number;
+}
+
+/**
+ * A trace entry.
+ */
+export interface TraceEntry {
+    /**
+     * The chunk.
+     */
+    readonly chunk: Buffer;
+    /**
+     * The destination.
+     */
+    readonly destination: vsp_contracts.ProxyDestination;
+    /**
+     * The error (if occurred).
+     */
+    readonly err?: any;
+    /**
+     * The source address.
+     */
+    readonly source: SocketAddress;
+    /**
+     * The target address.
+     */
+    readonly target: SocketAddress;
 }
 
 /**
@@ -39,16 +79,20 @@ interface EntryWithSocket {
  */
 export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     private readonly _ENTRY: vsp_contracts.ProxyEntry;
+    private readonly _PORT: number;
     private _server: Net.Server;
+    private _trace: TraceEntry[];
 
     /**
      * Initializes a new instance of that class.
      * 
+     * @param {number} port The TCP port.
      * @param {vsp_contracts.ProxyEntry} entry The underlying entry.
      */
-    constructor(entry: vsp_contracts.ProxyEntry) {
+    constructor(port: number, entry: vsp_contracts.ProxyEntry) {
         super();
 
+        this._PORT = port;
         this._ENTRY = entry;
     }
 
@@ -79,6 +123,20 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     }
 
     /**
+     * Gets if the proxy is current in trace mode or not.
+     */
+    public get isTracing() {
+        return !!this._trace;
+    }
+
+    /**
+     * The TCP port.
+     */
+    public get port(): number {
+        return this._PORT;
+    }
+
+    /**
      * Starts the proxy.
      * 
      * @return {Promise<boolean>} The promise that indicates if operation was successful or not.
@@ -95,7 +153,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             }
 
             try {
-                const SOURCE = vsp_helpers.getPortSafe(ME.entry.port, 8081);
+                const SOURCE = vsp_helpers.getPortSafe(ME.port, 8081);
                 const TARGETS = vsp_helpers.asArray(ME.entry.to).filter(t => {
                     return !vsp_helpers.isNullOrUndefined(t);
                 }).map(t => {
@@ -108,6 +166,24 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     }
                 };
 
+                const HANDLE_TRACE_ENTRY = (newEntry: TraceEntry) => {
+                    if (!newEntry) {
+                        return;
+                    }
+
+                    // append to trace
+                    try {
+                        const TRACE = ME._trace;
+                        if (TRACE) {
+                            TRACE.push(newEntry);
+                        }
+                    }
+                    catch (e) {
+                        console.trace('[Proxy] proxy.TcpProxy.start(append trace): ' +
+                                      vsp_helpers.toStringSafe(e));
+                    }
+                };
+
                 let newServer: Net.Server;
 
                 newServer = Net.createServer((from) => {
@@ -117,14 +193,14 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                         });
 
                         const TOs: EntryWithSocket[] = [];
-                        TARGETS.forEach(pe => {
+                        TARGETS.forEach(te => {
                             const TO = Net.createConnection({
-                                host: pe.host,
-                                port: pe.port,
+                                host: te.host,
+                                port: te.port,
                             });
 
                             const NEW_TO: EntryWithSocket = {
-                                entry: pe,
+                                entry: te,
                                 socket: TO,
                             };
 
@@ -134,37 +210,76 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                 HANDLE_ERROR(err, TO);
                             });
 
-                            TO.once('end', TO.end);
+                            TO.once('end', () => {
+                                TO.end();
+                            });
 
                             TO.on('data', function(chunk) {
+                                let err: any;
                                 try {
                                     from.write(chunk);
                                 }
                                 catch (e) {
-                                    HANDLE_ERROR(e, TO);
+                                    e = err;
                                 }
 
-                                ME.emit('data',
-                                        chunk, 'to', NEW_TO, from);
+                                const NEW_TRACE_ENTRY: TraceEntry = {
+                                    chunk: chunk,
+                                    destination: vsp_contracts.ProxyDestination.TargetToProxy,
+                                    err: err,
+                                    source: {
+                                        addr: TO.localAddress,
+                                        port: TO.localPort,
+                                    },
+                                    target: {
+                                        addr: from.localAddress,
+                                        port: from.localPort,
+                                    },
+                                };
+
+                                HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
+
+                                ME.emit('new_trace_entry',
+                                        NEW_TRACE_ENTRY);
                             });
                         });
 
                         from.on('data', function(chunk) {
-                            TOs.forEach(t => {
+                            TOs.forEach((t, index) => {
+                                let err: any;
                                 try {
                                     t.socket.write(chunk);
                                 }
                                 catch (e) {
-                                    HANDLE_ERROR(e, from);
+                                    err = e;
                                 }
 
-                                ME.emit('data',
-                                        chunk, 'from', from, t);
+                                t.socket.remoteAddress
+
+                                const NEW_TRACE_ENTRY: TraceEntry = {
+                                    chunk: chunk,
+                                    destination: vsp_contracts.ProxyDestination.ProxyToTarget,
+                                    err: err,
+                                    source: {
+                                        addr: from.localAddress,
+                                        port: from.localPort,
+                                    },
+                                    target: {
+                                        addr: t.socket.localAddress,
+                                        port: t.socket.localPort,
+                                    },
+                                };
+
+                                HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
+
+                                ME.emit('new_trace_entry',
+                                        NEW_TRACE_ENTRY);
                             });
                         });
 
-                        from.once('end', from.end);
-                        
+                        from.once('end', () => {
+                            from.end();
+                        });
                     }
                     catch (e) {
                         HANDLE_ERROR(e, newServer);
@@ -217,5 +332,31 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 COMPLETED(e);
             }
         });
+    }
+
+    /**
+     * Gets the current trace.
+     */
+    public get trace(): TraceEntry[] {
+        return this._trace;
+    }
+
+    /**
+     * Toggles trace state.
+     * 
+     * @return {Promise<TraceEntry[]>} The promise with the current trace.
+     */
+    public async toggleTrace() {
+        let trace: TraceEntry[];
+        
+        if (this.isTracing) {
+            trace = this.trace;
+            this._trace = null;
+        }
+        else {
+            trace = this._trace = [];
+        }
+
+        return trace;
     }
 }

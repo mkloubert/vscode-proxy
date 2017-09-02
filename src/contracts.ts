@@ -50,7 +50,7 @@ export interface Configuration extends vscode.WorkspaceConfiguration {
     /**
      * One or more proxy entries.
      */
-    readonly proxies?: ProxyEntry | ProxyEntry[];
+    readonly proxies?: { [port: string]: ProxyEntry; };
 }
 
 /**
@@ -72,6 +72,20 @@ export interface PackageFile {
 }
 
 /**
+ * Proxy destionation.
+ */
+export enum ProxyDestination {
+    /**
+     * From source / proxy to target.
+     */
+    ProxyToTarget = 0,
+    /**
+     * From target to source / proxy.
+     */
+    TargetToProxy = 1,
+}
+
+/**
  * A proxy entry.
  */
 export interface ProxyEntry {
@@ -87,10 +101,6 @@ export interface ProxyEntry {
      * The name of the proxy.
      */
     readonly name?: string;
-    /**
-     * The source port.
-     */
-    readonly port?: number;
     /**
      * The destination port(s) or address(es).
      */

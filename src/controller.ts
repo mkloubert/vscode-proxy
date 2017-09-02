@@ -27,6 +27,25 @@ import * as vsp_helpers from './helpers';
 import * as vsp_proxy from './proxy';
 
 
+interface ProxyEntryWithPort {
+    readonly entry: vsp_contracts.ProxyEntry;
+    readonly port: number;
+}
+
+function getProxyName(name: string, port: number, nr: number) {
+    name = vsp_helpers.toStringSafe(name).trim();
+    if ('' === name) {
+        const SOURCE_PORT = vsp_helpers.getPortSafe(port, 8081);
+
+        name = `Proxy #${nr} - ${SOURCE_PORT}`;
+    }
+
+    return name;
+}
+
+/**
+ * The extension controller.
+ */
 export class Controller implements vscode.Disposable {
     private _config: vsp_contracts.Configuration;
     private readonly _CONTEXT: vscode.ExtensionContext;
@@ -81,10 +100,31 @@ export class Controller implements vscode.Disposable {
 
     /**
      * Returns all proxy entries.
+     * 
+     * @return {ProxyEntryWithPort[]} The entries.
      */
-    public getProxyEntries(): vsp_contracts.ProxyEntry[] {
-        return vsp_helpers.asArray(this.config.proxies)
-                          .filter(x => 'object' === typeof x)
+    protected getProxyEntries(): ProxyEntryWithPort[] {
+        const LOADED_ENTRIES: ProxyEntryWithPort[] = [];
+        
+        const PROXIES = this.config.proxies;
+        if (PROXIES) {
+            for (let p in PROXIES) {
+                const PORT = parseInt( p.trim() );
+                if (isNaN(PORT)) {
+                    continue;
+                }
+
+                const ENTRY = PROXIES[p];
+                if (ENTRY) {
+                    LOADED_ENTRIES.push({
+                        entry: ENTRY,
+                        port: PORT,
+                    });
+                }
+            }
+        }
+
+        return LOADED_ENTRIES;
     }
 
     /**
@@ -162,7 +202,9 @@ export class Controller implements vscode.Disposable {
 
         const ENTRIES = this.getProxyEntries();
         for (let i = 0; i < ENTRIES.length; i++) {
-            const NEW_PROXY = new vsp_proxy.TcpProxy(ENTRIES[i]);
+            const E = ENTRIES[i];
+
+            const NEW_PROXY = new vsp_proxy.TcpProxy(E.port, E.entry);
             this._PROXIES.push(NEW_PROXY);
 
             if (vsp_helpers.toBooleanSafe(NEW_PROXY.entry.autoStart)) {
@@ -178,6 +220,13 @@ export class Controller implements vscode.Disposable {
         }
     }
 
+    /**
+     * Shows quick picks for the current list of proxies.
+     * 
+     * @param {string} placeHolder The placeholder. 
+     * @param {Function} action The action to invoke for the selected proxies.
+     * @param {Function} [iconResolver] The function that receives the icon name for a proxy entry.
+     */
     protected async showProxyQuickPick(placeHolder: string,
                                        action: (proxies: vsp_proxy.TcpProxy[]) => any,
                                        iconResolver?: (proxy: vsp_proxy.TcpProxy) => any) {
@@ -192,16 +241,12 @@ export class Controller implements vscode.Disposable {
         };
 
         const QUICK_PICKS = ALL_PROXIES.map((p, i) => {
+            const PORT = p.port;
             const ENTRY = p.entry;
 
             let description = vsp_helpers.toStringSafe(ENTRY.description).trim();
 
-            let name = vsp_helpers.toStringSafe(ENTRY.name).trim();
-            if ('' === name) {
-                const SOURCE_PORT = vsp_helpers.getPortSafe(ENTRY.port, 8081);
-
-                name = `Proxy #${i + 1} - ${SOURCE_PORT}`;
-            }
+            let name = getProxyName(ENTRY.name, PORT, i + 1);
 
             if (iconResolver) {
                 const ICON = vsp_helpers.toStringSafe(
@@ -269,24 +314,38 @@ export class Controller implements vscode.Disposable {
                 for (let i = 0; i < proxies.length; i++) {
                     const P = proxies[i];
 
+                    let proxyName = getProxyName(P.entry.name, P.port, i + 1);
+                    let errMsg: string;
                     try {
                         if (P.isRunning) {
+                            errMsg = `Could not stop proxy '${proxyName}'`;
+
                             await P.stop();
                         }
                         else {
+                            errMsg = `Could not start proxy '${proxyName}'`;
+
                             await P.start();
                         }
                     }
                     catch (e) {
-                        //TODO: show error message
+                        vscode.window.showErrorMessage(`[Proxy] ${errMsg}: ${vsp_helpers.toStringSafe(e)}}`).then(() => {
+                        }, (err) => {
+                            console.trace('[Proxy] controller.startStop(2): ' +
+                                          vsp_helpers.toStringSafe(err));
+                        });
                     }
                 }
             }, (p) => {
-                return p.isRunning ? 'primitive-square' : 'triangle-right';
+                return p.isRunning ? 'triangle-right' : 'primitive-square';
             });
         }
         catch (e) {
-            //TODO: show error message
+            vscode.window.showErrorMessage(`[Proxy] Could not show proxies for start / stop: ${vsp_helpers.toStringSafe(e)}}`).then(() => {
+            }, (err) => {
+                console.trace('[Proxy] controller.startStop(1): ' +
+                              vsp_helpers.toStringSafe(err));
+            });
         }
     }
 
@@ -299,19 +358,40 @@ export class Controller implements vscode.Disposable {
                 for (let i = 0; i < proxies.length; i++) {
                     const P = proxies[i];
 
+                    let isTracing = P.isTracing;
+                    let proxyName = getProxyName(P.entry.name, P.port, i + 1);
+                    let errMsg: string;
                     try {
-                        //TODO: implement
+                        if (isTracing) {
+                            errMsg = `Could not stop proxy tracing for '${proxyName}'`;
+                        }
+                        else {
+                            errMsg = `Could not start proxy tracing for '${proxyName}'`;
+                        }
+
+                        const TRACE = await P.toggleTrace();
+                        if (TRACE) {
+                            //TODO
+                        }
                     }
                     catch (e) {
-                        //TODO: show error message
+                        vscode.window.showErrorMessage(`[Proxy] ${errMsg}: ${vsp_helpers.toStringSafe(e)}}`).then(() => {
+                        }, (err) => {
+                            console.trace('[Proxy] controller.startStop(2): ' +
+                                          vsp_helpers.toStringSafe(err));
+                        });
                     }
                 }
             }, (p) => {
-                //TODO: return icon
+                return p.isTracing ? 'triangle-right' : 'primitive-square';
             });
         }
         catch (e) {
-            //TODO: show error message
+            vscode.window.showErrorMessage(`[Proxy] Could not show proxies for trace: ${vsp_helpers.toStringSafe(e)}}`).then(() => {
+            }, (err) => {
+                console.trace('[Proxy] controller.trace(1): ' +
+                              vsp_helpers.toStringSafe(err));
+            });
         }
     }
 }
