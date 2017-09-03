@@ -44,6 +44,33 @@ export interface ActionQuickPickItem<TState = any> extends vscode.QuickPickItem 
 }
 
 /**
+ * A module for handling a chunk.
+ */
+export interface ChunkHandlerModule {
+    /**
+     * Handles a chunk.
+     */
+    readonly handleChunk: ChunkHandlerModuleExecutor;
+}
+
+/**
+ * Logic for handling a chunk.
+ * 
+ * @param {ChunkHandlerModuleExecutorArguments} args The arguments.
+ */
+export type ChunkHandlerModuleExecutor = (args: ChunkHandlerModuleExecutorArguments) => any;
+
+/**
+ * Arguments for handling a chunk.
+ */
+export interface ChunkHandlerModuleExecutorArguments extends ScriptArguments {
+    /**
+     * The current (or new chunk) to send.
+     */
+    chunk: Buffer;
+}
+
+/**
  * Extension settings.
  */
 export interface Configuration extends vscode.WorkspaceConfiguration {
@@ -94,6 +121,14 @@ export interface ProxyEntry {
      */
     readonly autoStart?: boolean;
     /**
+     * The path to the script that handles a chunk.
+     */
+    readonly chunkHandler?: string;
+    /**
+     * Additional options for the "chunk handler".
+     */
+    readonly chunkHandlerOptions?: any;
+    /**
      * An additional description for the proxy.
      */
     readonly description?: string;
@@ -101,6 +136,27 @@ export interface ProxyEntry {
      * The name of the proxy.
      */
     readonly name?: string;
+    /**
+     * The custom list of targets (s. 'to') from where to send answers back
+     * to the source / client or (false) to disable that feature. Default: First target.
+     */
+    readonly receiveChunksFrom?: false | number | number[];
+    /**
+     * The path to the script that handles a (new) trace entry.
+     */
+    readonly traceHandler?: string;
+    /**
+     * Additional options for the "trace handler".
+     */
+    readonly traceHandlerOptions?: any;
+    /**
+     * The path to the script that writes a trace list, when tracing is stopped.
+     */
+    readonly traceWriter?: string;
+    /**
+     * Additional options for the "trace writer".
+     */
+    readonly traceWriterOptions?: any;
     /**
      * The destination port(s) or address(es).
      */
@@ -111,3 +167,111 @@ export interface ProxyEntry {
  * A proxy target.
  */
 export type ProxyTarget = string | number;
+
+/**
+ * Script arguments.
+ */
+export interface ScriptArguments {
+    /**
+     * Additional options for the script.
+     */
+    readonly options?: any;
+}
+
+/**
+ * A socket address.
+ */
+export interface SocketAddress {
+    /**
+     * The (local) address.
+     */
+    readonly addr: string;
+    /**
+     * The (local) TCP port.
+     */
+    readonly port: number;
+}
+
+/**
+ * A trace entry.
+ */
+export interface TraceEntry {
+    /**
+     * The chunk.
+     */
+    readonly chunk: Buffer;
+    /**
+     * The destination.
+     */
+    readonly destination: ProxyDestination;
+    /**
+     * The error (if occurred).
+     */
+    readonly err?: any;
+    /**
+     * The source address.
+     */
+    readonly source: SocketAddress;
+    /**
+     * The target address.
+     */
+    readonly target: SocketAddress;
+}
+
+/**
+ * A trace handler module.
+ */
+export interface TraceHandlerModule {
+    /**
+     * Handles a new trace entry.
+     */
+    readonly handleTrace: TraceWriterModuleExecutor;
+}
+
+/**
+ * Executes the trace handler logic.
+ * 
+ * @param {TraceHandlerModuleExecutorArguments} args The arguments.
+ */
+export type TraceHandlerModuleExecutor = (args: TraceHandlerModuleExecutorArguments) => any;
+
+/**
+ * Arguments for the trace handler.
+ */
+export interface TraceHandlerModuleExecutorArguments extends ScriptArguments {
+    /**
+     * The current entry,
+     */
+    readonly entry: TraceEntry;
+    /**
+     * The current trace list.
+     */
+    readonly trace: TraceEntry[];
+}
+
+/**
+ * A trace writer module.
+ */
+export interface TraceWriterModule {
+    /**
+     * Writes a trace list.
+     */
+    readonly writeTrace: TraceWriterModuleExecutor;
+}
+
+/**
+ * Executes the trace writer logic.
+ * 
+ * @param {TraceWriterModuleExecutorArguments} args The arguments.
+ */
+export type TraceWriterModuleExecutor = (args: TraceWriterModuleExecutorArguments) => any;
+
+/**
+ * Arguments for the trace writer.
+ */
+export interface TraceWriterModuleExecutorArguments extends ScriptArguments {
+    /**
+     * The trace list to write.
+     */
+    readonly trace: TraceEntry[];
+}

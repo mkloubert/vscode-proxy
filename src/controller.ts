@@ -152,7 +152,7 @@ export class Controller implements vscode.Disposable {
         ME.context.subscriptions
                   .push(ME);
 
-            ME.reloadConfiguration();
+        ME.reloadConfiguration();
     }
 
     /**
@@ -190,7 +190,13 @@ export class Controller implements vscode.Disposable {
 
         this.reloadProxies().then(() => {
         }).catch((err) => {
-            //TODO: show error message
+            // reloading proxies failed
+
+            vscode.window.showErrorMessage(`[Proxy] Could not reload proxies: ${vsp_helpers.toStringSafe(err)}}`).then(() => {
+            }, (err) => {
+                console.trace('[Proxy] controller.reloadConfiguration(): ' +
+                              vsp_helpers.toStringSafe(err));
+            });
         });
     }
 
@@ -207,14 +213,28 @@ export class Controller implements vscode.Disposable {
             const NEW_PROXY = new vsp_proxy.TcpProxy(E.port, E.entry);
             this._PROXIES.push(NEW_PROXY);
 
+            const PROXY_NAME = getProxyName(E.entry.name, E.port, i + 1);
+
             if (vsp_helpers.toBooleanSafe(NEW_PROXY.entry.autoStart)) {
                 try {
                     if (!(await NEW_PROXY.start())) {
-                        //TODO: show error message
+                        // already running
+
+                        vscode.window.showWarningMessage(`[Proxy] Proxy '${PROXY_NAME}' already running.`).then(() => {
+                        }, (err) => {
+                            console.trace('[Proxy] controller.reloadProxies(2): ' +
+                                          vsp_helpers.toStringSafe(err));
+                        });
                     }
                 }
                 catch (e) {
-                    //TODO: show error message
+                    // autostart failed
+
+                    vscode.window.showErrorMessage(`[Proxy] Could not autostart proxy '${PROXY_NAME}': ${vsp_helpers.toStringSafe(e)}}`).then(() => {
+                    }, (err) => {
+                        console.trace('[Proxy] controller.reloadProxies(1): ' +
+                                      vsp_helpers.toStringSafe(err));
+                    });
                 }
             }
         }
@@ -293,16 +313,11 @@ export class Controller implements vscode.Disposable {
             );
         };
 
-        if (<any>true || QUICK_PICKS.length > 2) {
-            await HANDLE_ITEM(
-                await vscode.window.showQuickPick(QUICK_PICKS, {
-                    placeHolder: placeHolder,
-                })
-            );
-        }
-        else {
-            await HANDLE_ITEM(QUICK_PICKS[0]);
-        }
+        await HANDLE_ITEM(
+            await vscode.window.showQuickPick(QUICK_PICKS, {
+                placeHolder: placeHolder,
+            })
+        );
     }
 
     /**
@@ -314,21 +329,23 @@ export class Controller implements vscode.Disposable {
                 for (let i = 0; i < proxies.length; i++) {
                     const P = proxies[i];
 
-                    let proxyName = getProxyName(P.entry.name, P.port, i + 1);
+                    const PROXY_NAME = getProxyName(P.entry.name, P.port, i + 1);
                     let errMsg: string;
                     try {
                         if (P.isRunning) {
-                            errMsg = `Could not stop proxy '${proxyName}'`;
+                            errMsg = `Could not stop proxy '${PROXY_NAME}'`;
 
                             await P.stop();
                         }
                         else {
-                            errMsg = `Could not start proxy '${proxyName}'`;
+                            errMsg = `Could not start proxy '${PROXY_NAME}'`;
 
                             await P.start();
                         }
                     }
                     catch (e) {
+                        // failed toggle tracing
+
                         vscode.window.showErrorMessage(`[Proxy] ${errMsg}: ${vsp_helpers.toStringSafe(e)}}`).then(() => {
                         }, (err) => {
                             console.trace('[Proxy] controller.startStop(2): ' +
@@ -341,6 +358,8 @@ export class Controller implements vscode.Disposable {
             });
         }
         catch (e) {
+            // "global" error
+
             vscode.window.showErrorMessage(`[Proxy] Could not show proxies for start / stop: ${vsp_helpers.toStringSafe(e)}}`).then(() => {
             }, (err) => {
                 console.trace('[Proxy] controller.startStop(1): ' +
@@ -358,15 +377,14 @@ export class Controller implements vscode.Disposable {
                 for (let i = 0; i < proxies.length; i++) {
                     const P = proxies[i];
 
-                    let isTracing = P.isTracing;
-                    let proxyName = getProxyName(P.entry.name, P.port, i + 1);
+                    const PROXY_NAME = getProxyName(P.entry.name, P.port, i + 1);
                     let errMsg: string;
                     try {
-                        if (isTracing) {
-                            errMsg = `Could not stop proxy tracing for '${proxyName}'`;
+                        if (P.isTracing) {
+                            errMsg = `Could not stop proxy tracing for '${PROXY_NAME}'`;
                         }
                         else {
-                            errMsg = `Could not start proxy tracing for '${proxyName}'`;
+                            errMsg = `Could not start proxy tracing for '${PROXY_NAME}'`;
                         }
 
                         const TRACE = await P.toggleTrace();
@@ -375,9 +393,11 @@ export class Controller implements vscode.Disposable {
                         }
                     }
                     catch (e) {
+                        // failed toggle tracing
+
                         vscode.window.showErrorMessage(`[Proxy] ${errMsg}: ${vsp_helpers.toStringSafe(e)}}`).then(() => {
                         }, (err) => {
-                            console.trace('[Proxy] controller.startStop(2): ' +
+                            console.trace('[Proxy] controller.trace(2): ' +
                                           vsp_helpers.toStringSafe(err));
                         });
                     }
@@ -387,6 +407,8 @@ export class Controller implements vscode.Disposable {
             });
         }
         catch (e) {
+            // "global" error
+
             vscode.window.showErrorMessage(`[Proxy] Could not show proxies for trace: ${vsp_helpers.toStringSafe(e)}}`).then(() => {
             }, (err) => {
                 console.trace('[Proxy] controller.trace(1): ' +

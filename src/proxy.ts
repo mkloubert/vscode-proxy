@@ -34,45 +34,6 @@ interface EntryWithSocket {
     readonly socket: Net.Socket;
 }
 
-/**
- * A socket address.
- */
-export interface SocketAddress {
-    /**
-     * The (local) address.
-     */
-    readonly addr: string;
-    /**
-     * The (local) TCP port.
-     */
-    readonly port: number;
-}
-
-/**
- * A trace entry.
- */
-export interface TraceEntry {
-    /**
-     * The chunk.
-     */
-    readonly chunk: Buffer;
-    /**
-     * The destination.
-     */
-    readonly destination: vsp_contracts.ProxyDestination;
-    /**
-     * The error (if occurred).
-     */
-    readonly err?: any;
-    /**
-     * The source address.
-     */
-    readonly source: SocketAddress;
-    /**
-     * The target address.
-     */
-    readonly target: SocketAddress;
-}
 
 /**
  * A TCP proxy.
@@ -81,7 +42,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     private readonly _ENTRY: vsp_contracts.ProxyEntry;
     private readonly _PORT: number;
     private _server: Net.Server;
-    private _trace: TraceEntry[];
+    private _trace: vsp_contracts.TraceEntry[];
 
     /**
      * Initializes a new instance of that class.
@@ -160,20 +121,48 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     return vsp_helpers.getHostAndPort(t, 8080);
                 });
 
+                let receiveChunksFrom: false | number[] = <any>ME.entry.receiveChunksFrom;
+                if (vsp_helpers.isUndefined(receiveChunksFrom)) {
+                    receiveChunksFrom = [ 0 ];  // default: first target
+                }
+                else {
+                    if (false !== receiveChunksFrom) {
+                        receiveChunksFrom = vsp_helpers.asArray(receiveChunksFrom).map(x => {
+                            return parseInt( vsp_helpers.toStringSafe(x).trim() );
+                        }).filter(x => !isNaN(x));
+                    }
+                }
+
+                if (Array.isArray(receiveChunksFrom)) {
+                    receiveChunksFrom = vsp_helpers.distinctArray( receiveChunksFrom );
+                }
+
+                let handleTrace: vsp_contracts.TraceHandlerModuleExecutor;
+                let handleTraceOptions = vsp_helpers.cloneObject(
+                    this.entry.traceHandlerOptions,
+                );
+                if (!vsp_helpers.isEmptyString(this.entry.traceHandler)) {
+                    const HANDLER_MODULE = vsp_helpers.loadModule<vsp_contracts.TraceHandlerModule>(this.entry.traceHandler);
+                    if (HANDLER_MODULE) {
+                        handleTrace = HANDLER_MODULE.handleTrace;
+                    }
+                }
+
                 const HANDLE_ERROR = (err: any, source?: any) => {
                     if (!err) {
                         return;
                     }
                 };
 
-                const HANDLE_TRACE_ENTRY = (newEntry: TraceEntry) => {
+                const HANDLE_TRACE_ENTRY = (newEntry: vsp_contracts.TraceEntry) => {
                     if (!newEntry) {
                         return;
                     }
 
+                    const TRACE = ME._trace;
+
                     // append to trace
                     try {
-                        const TRACE = ME._trace;
                         if (TRACE) {
                             TRACE.push(newEntry);
                         }
@@ -182,6 +171,42 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                         console.trace('[Proxy] proxy.TcpProxy.start(append trace): ' +
                                       vsp_helpers.toStringSafe(e));
                     }
+
+                    // trace handler
+                    if (handleTrace) {
+                        const ARGS: vsp_contracts.TraceHandlerModuleExecutorArguments = {
+                            entry: newEntry,
+                            options: handleTraceOptions,
+                            trace: TRACE,
+                        };
+
+                        handleTrace(ARGS);
+                    }
+                };
+
+                const HANDLE_CHUNK = (chunk: Buffer) => {
+                    let newCunk = chunk;
+
+                    // chunk handler
+                    if (!vsp_helpers.isEmptyString(this.entry.chunkHandler)) {
+                        const ARGS: vsp_contracts.ChunkHandlerModuleExecutorArguments = {
+                            chunk: chunk,
+                            options: vsp_helpers.cloneObject(this.entry.chunkHandlerOptions),
+                        };
+        
+                        const HANDLER_MODULE = vsp_helpers.loadModule<vsp_contracts.ChunkHandlerModule>(this.entry.chunkHandler);
+                        if (HANDLER_MODULE) {
+                            const HANDLE_CHUNK = HANDLER_MODULE.handleChunk;
+                            if (HANDLE_CHUNK) {
+                                HANDLE_CHUNK.apply(HANDLER_MODULE, 
+                                                   [ ARGS ]);
+                            }
+                        }
+
+                        newCunk = ARGS.chunk;
+                    }
+
+                    return newCunk;
                 };
 
                 let newServer: Net.Server;
@@ -193,7 +218,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                         });
 
                         const TOs: EntryWithSocket[] = [];
-                        TARGETS.forEach(te => {
+                        TARGETS.forEach((te, i) => {
                             const TO = Net.createConnection({
                                 host: te.host,
                                 port: te.port,
@@ -215,65 +240,95 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                             });
 
                             TO.on('data', function(chunk) {
-                                let err: any;
                                 try {
-                                    from.write(chunk);
-                                }
-                                catch (e) {
-                                    e = err;
-                                }
-
-                                const NEW_TRACE_ENTRY: TraceEntry = {
-                                    chunk: chunk,
-                                    destination: vsp_contracts.ProxyDestination.TargetToProxy,
-                                    err: err,
-                                    source: {
+                                    let SOURCE: vsp_contracts.SocketAddress = {
                                         addr: TO.localAddress,
                                         port: TO.localPort,
-                                    },
-                                    target: {
+                                    };
+                                    let TARGET: vsp_contracts.SocketAddress = {
                                         addr: from.localAddress,
                                         port: from.localPort,
-                                    },
-                                };
+                                    };
 
-                                HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
+                                    chunk = HANDLE_CHUNK(
+                                        chunk
+                                    );
 
-                                ME.emit('new_trace_entry',
-                                        NEW_TRACE_ENTRY);
+                                    let err: any;
+                                    if (chunk && chunk.length > 0) {
+                                        if (false !== receiveChunksFrom) {
+                                            if (receiveChunksFrom.indexOf(i) > -1) {
+                                                try {
+                                                    from.write(chunk);  // send "answer"
+                                                }
+                                                catch (e) {
+                                                    e = err;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    const NEW_TRACE_ENTRY: vsp_contracts.TraceEntry = {
+                                        chunk: chunk,
+                                        destination: vsp_contracts.ProxyDestination.TargetToProxy,
+                                        err: err,
+                                        source: SOURCE,
+                                        target: TARGET,
+                                    };
+
+                                    HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
+
+                                    ME.emit('new_trace_entry',
+                                            NEW_TRACE_ENTRY);
+                                }
+                                catch (e) {
+                                    HANDLE_ERROR(e, from);
+                                }
                             });
                         });
 
-                        from.on('data', function(chunk) {
+                        from.on('data', async function(chunk) {
                             TOs.forEach((t, index) => {
-                                let err: any;
                                 try {
-                                    t.socket.write(chunk);
-                                }
-                                catch (e) {
-                                    err = e;
-                                }
-
-                                t.socket.remoteAddress
-
-                                const NEW_TRACE_ENTRY: TraceEntry = {
-                                    chunk: chunk,
-                                    destination: vsp_contracts.ProxyDestination.ProxyToTarget,
-                                    err: err,
-                                    source: {
+                                    let SOURCE: vsp_contracts.SocketAddress = {
                                         addr: from.localAddress,
                                         port: from.localPort,
-                                    },
-                                    target: {
+                                    };
+                                    let TARGET: vsp_contracts.SocketAddress = {
                                         addr: t.socket.localAddress,
                                         port: t.socket.localPort,
-                                    },
-                                };
+                                    };
 
-                                HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
+                                    chunk = HANDLE_CHUNK(
+                                        chunk
+                                    );
 
-                                ME.emit('new_trace_entry',
-                                        NEW_TRACE_ENTRY);
+                                    let err: any;
+                                    if (chunk && chunk.length > 0) {
+                                        try {
+                                            t.socket.write(chunk);  // send "request"
+                                        }
+                                        catch (e) {
+                                            err = e;
+                                        }
+                                    }
+
+                                    const NEW_TRACE_ENTRY: vsp_contracts.TraceEntry = {
+                                        chunk: chunk,
+                                        destination: vsp_contracts.ProxyDestination.ProxyToTarget,
+                                        err: err,
+                                        source: SOURCE,
+                                        target: TARGET,
+                                    };
+
+                                    HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
+
+                                    ME.emit('new_trace_entry',
+                                            NEW_TRACE_ENTRY);
+                                }
+                                catch (e) {
+                                    HANDLE_ERROR(e, t.socket);
+                                }
                             });
                         });
 
@@ -337,7 +392,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     /**
      * Gets the current trace.
      */
-    public get trace(): TraceEntry[] {
+    public get trace(): vsp_contracts.TraceEntry[] {
         return this._trace;
     }
 
@@ -347,10 +402,30 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
      * @return {Promise<TraceEntry[]>} The promise with the current trace.
      */
     public async toggleTrace() {
-        let trace: TraceEntry[];
+        let trace: vsp_contracts.TraceEntry[];
         
         if (this.isTracing) {
             trace = this.trace;
+
+            if (!vsp_helpers.isEmptyString(this.entry.traceWriter)) {
+                const ARGS: vsp_contracts.TraceWriterModuleExecutorArguments = {
+                    options: vsp_helpers.cloneObject(
+                        this.entry.traceWriterOptions,
+                    ),
+                    trace: trace,
+                };
+
+                const WRITER_MODULE = vsp_helpers.loadModule<vsp_contracts.TraceWriterModule>(this.entry.traceWriter);
+                if (WRITER_MODULE) {
+                    const WRITE_TRACE = WRITER_MODULE.writeTrace;
+                    if (WRITE_TRACE) {
+                        await Promise.resolve(
+                            WRITE_TRACE(ARGS),
+                        );
+                    }
+                }
+            }
+
             this._trace = null;
         }
         else {

@@ -21,6 +21,11 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+import * as FS from 'fs';
+import * as Path from 'path';
+import * as vscode from 'vscode';
+
+
 /**
  * Describes a simple 'completed' action.
  * 
@@ -43,6 +48,23 @@ export function asArray<T = any>(val: T | T[]): T[] {
     }
 
     return val;
+}
+
+/**
+ * Clones an object / value deep.
+ * 
+ * @param {T} val The value / object to clone.
+ * 
+ * @return {T} The cloned value / object.
+ */
+export function cloneObject<T>(val: T): T {
+    if (!val) {
+        return val;
+    }
+
+    return JSON.parse(
+        JSON.stringify(val)
+    );
 }
 
 /**
@@ -74,6 +96,23 @@ export function createSimpleCompletedAction<TResult>(resolve: (value?: TResult |
             }
         }
     };
+}
+
+/**
+ * Removes duplicate entries from an array.
+ * 
+ * @param {T[]} arr The input array.
+ * 
+ * @return {T[]} The filtered array.
+ */
+export function distinctArray<T>(arr: T[]): T[] {
+    if (!arr) {
+        return arr;
+    }
+
+    return arr.filter((x, i) => {
+        return arr.indexOf(x) === i;
+    });
 }
 
 /**
@@ -180,6 +219,35 @@ export function isNull(val: any): val is null {
 export function isNullOrUndefined(val: any): val is (null | undefined) {
     return isNull(val) ||
            isUndefined(val);
+}
+
+/**
+ * Loads a module.
+ * 
+ * @param {string} file The path of the module's file.
+ * @param {boolean} useCache Use cache or not.
+ * 
+ * @return {TModule} The loaded module.
+ */
+export function loadModule<TModule>(file: string, useCache: boolean = false): TModule {
+    file = toStringSafe(file);
+    if (!Path.isAbsolute(file)) {
+        file = Path.join(vscode.workspace.rootPath, file);
+    }
+    file = Path.resolve(file);
+
+    useCache = toBooleanSafe(useCache);
+
+    let stats = FS.lstatSync(file);
+    if (!stats.isFile()) {
+        throw new Error(`'${file}' is NO file!`);
+    }
+
+    if (!useCache) {
+        delete require.cache[file];  // remove from cache
+    }
+    
+    return require(file);
 }
 
 /**
