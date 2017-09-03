@@ -222,6 +222,17 @@ export function isNullOrUndefined(val: any): val is (null | undefined) {
 }
 
 /**
+ * Checks if a value is (undefined).
+ * 
+ * @param {any} val The value to check.
+ * 
+ * @return {boolean} Is (undefined) or not.
+ */
+export function isUndefined(val: any): val is undefined {
+    return 'undefined' === typeof val;
+}
+
+/**
  * Loads a module.
  * 
  * @param {string} file The path of the module's file.
@@ -230,11 +241,7 @@ export function isNullOrUndefined(val: any): val is (null | undefined) {
  * @return {TModule} The loaded module.
  */
 export function loadModule<TModule>(file: string, useCache: boolean = false): TModule {
-    file = toStringSafe(file);
-    if (!Path.isAbsolute(file)) {
-        file = Path.join(vscode.workspace.rootPath, file);
-    }
-    file = Path.resolve(file);
+    file = toFullPath(file);
 
     useCache = toBooleanSafe(useCache);
 
@@ -297,14 +304,25 @@ export function toStringSafe(str: any, defValue: any = ''): string {
 }
 
 /**
- * Checks if a value is (undefined).
+ * Converts to a full, clean path.
  * 
- * @param {any} val The value to check.
+ * @param {string} path The path to convert.
  * 
- * @return {boolean} Is (undefined) or not.
+ * @return {string} The full path.
  */
-export function isUndefined(val: any): val is undefined {
-    return 'undefined' === typeof val;
+export function toFullPath(path: string): string {
+    path = toStringSafe(path);
+    if (isEmptyString(path)) {
+        path = './';
+    }
+    if (!Path.isAbsolute(path)) {
+        path = Path.join(
+            Path.join(vscode.workspace.rootPath, '.vscode'),
+            path,
+        );
+    }
+
+    return Path.resolve(path);
 }
 
 /**
