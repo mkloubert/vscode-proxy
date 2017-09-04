@@ -23,11 +23,12 @@
 
 import * as Enumerable from 'node-enumerable';
 import * as Events from 'events';
+import * as FileSize from 'filesize';
 const Hexy = require('hexy');
 import * as Moment from 'moment';
 import * as Net from 'net';
 import * as Stream from 'stream';
-import * as uuid from 'uuid';
+import * as UUID from 'uuid';
 import * as vscode from 'vscode';
 import * as vsp_contracts from './contracts';
 import * as vsp_controller from './controller';
@@ -110,6 +111,13 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
         return this._CONTROLLER;
     }
 
+    /**
+     * Gets the default button color.
+     */
+    public get defaultButtonColor() {
+        return this.isTracing ? '#ffffff' : '#808080';
+    }
+
     /** @inheritdoc */
     public dispose() {
         this.removeAllListeners();
@@ -166,6 +174,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             ME._button.hide();
 
             ME.updateButton();
+
+            ME._button.color = ME.defaultButtonColor;
         }
         catch (e) {
             vsp_helpers.tryDispose(ME._button);
@@ -324,6 +334,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
         const ME = this;
 
         try {
+            ME._button.color = ME.defaultButtonColor;
+
             const QUICK_PICKS: vsp_contracts.ActionQuickPickItem[] = [];
 
             const IS_TRACING = ME.isTracing;
@@ -599,7 +611,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 newServer = Net.createServer((from) => {
                     try {
                         const SESSION = {
-                            id: uuid.v4(),
+                            id: UUID.v4(),
                             time: Moment.utc(),
                         };
 
@@ -785,6 +797,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     ME._server = newServer;
 
                     ME.updateButton();
+                    ME._button.color = ME.defaultButtonColor;
+
                     ME._button.show();
 
                     COMPLETED(null, true);
@@ -959,13 +973,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
         let text = `$(microscope)  ${this.name}`;
 
-        let color: string;
-        if (this.isTracing) {
-            color = '#ffff00';
-        }
-        else {
-            color = '#ffffff';
-        }
+        let color = this.defaultButtonColor;
 
         let tooltip: string;
 
@@ -973,14 +981,19 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
         if (STATS) {
             tooltip = `Send: ${STATS.chunksSend} chunk(s) / ${STATS.bytesSend} byte(s)
 Received: ${STATS.chunksReceived} chunk(s) / ${STATS.bytesReceived} byte(s)`;
+
+            text += ` (S: ${STATS.chunksSend} (${FileSize(STATS.bytesSend)}); R: ${STATS.chunksReceived} (${FileSize(STATS.bytesReceived)}))`;
         }
 
         if (BTN.text !== text) {
             BTN.text = text;
+
+            color = '#ffff00';
         }
         if (BTN.tooltip !== tooltip) {
             BTN.tooltip = tooltip;
         }
+
         if (BTN.color !== color) {
             BTN.color = color;
         }

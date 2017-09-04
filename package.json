@@ -2,7 +2,7 @@
     "name": "vscode-proxy",
     "displayName": "Proxy",
     "description": "Runs TCP proxies with additional trace support.",
-    "version": "0.11.0",
+    "version": "0.12.0",
     "publisher": "mkloubert",
     "engines": {
         "vscode": "^1.13.0"
@@ -148,7 +148,7 @@
                                             "description": "Initial state value for the 'trace writer'."
                                         },
                                         "to": {
-                                            "oneOf":[
+                                            "oneOf": [
                                                 {
                                                     "description": "The target port.",
                                                     "type": "integer",
@@ -215,6 +215,7 @@
         "test": "node ./node_modules/vscode/bin/test"
     },
     "devDependencies": {
+        "@types/filesize": "^3.2.15",
         "@types/mocha": "^2.2.32",
         "@types/node": "^6.0.40",
         "@types/uuid": "^3.4.1",
@@ -223,6 +224,7 @@
         "vscode": "^1.0.0"
     },
     "dependencies": {
+        "filesize": "^3.5.10",
         "hexy": "^0.2.10",
         "moment": "^2.18.1",
         "node-enumerable": "^2.0.1",
