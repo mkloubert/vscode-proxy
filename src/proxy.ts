@@ -536,15 +536,50 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
                     const TRACE = ME._trace;
 
-                    // append to trace
-                    try {
-                        if (TRACE) {
-                            TRACE.push(newEntry);
-                        }
+                    let appendToTrace = true;
+                                        // trace handler
+                    if (handleTrace) {
+                        const ARGS: vsp_contracts.TraceHandlerModuleExecutorArguments = {
+                            config: CFG,
+                            context: ME.controller.context,
+                            entry: newEntry,
+                            globals: GLOBALS,
+                            globalState: ME._globalScriptState,
+                            options: handleTraceOptions,
+                            outputChannel: ME.controller.outputChannel,
+                            packageFile: PKG_FILE,
+                            save: appendToTrace,
+                            state: undefined,
+                            trace: TRACE,
+                        };
+
+                        // ARGS.state
+                        Object.defineProperty(ARGS, 'state', {
+                            get: () => handleTraceState,
+                            set: (newValue) => {
+                                handleTraceState = newValue;
+                            },
+                        });
+
+                        handleTrace(ARGS);
+
+                        appendToTrace = vsp_helpers.toBooleanSafe(
+                            ARGS.save,
+                            true
+                        );
                     }
-                    catch (e) {
-                        console.trace('[Proxy] proxy.TcpProxy.start(append trace): ' +
-                                      vsp_helpers.toStringSafe(e));
+
+                    // append to trace
+                    if (appendToTrace) {
+                        try {
+                            if (TRACE) {
+                                TRACE.push(newEntry);
+                            }
+                        }
+                        catch (e) {
+                            console.trace('[Proxy] proxy.TcpProxy.start(append trace): ' +
+                                        vsp_helpers.toStringSafe(e));
+                        }
                     }
 
                     // write to output
@@ -560,32 +595,6 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                               vsp_helpers.toStringSafe(e));
                             }
                         }
-                    }
-
-                    // trace handler
-                    if (handleTrace) {
-                        const ARGS: vsp_contracts.TraceHandlerModuleExecutorArguments = {
-                            config: CFG,
-                            context: ME.controller.context,
-                            entry: newEntry,
-                            globals: GLOBALS,
-                            globalState: ME._globalScriptState,
-                            options: handleTraceOptions,
-                            outputChannel: ME.controller.outputChannel,
-                            packageFile: PKG_FILE,
-                            state: undefined,
-                            trace: TRACE,
-                        };
-
-                        // ARGS.state
-                        Object.defineProperty(ARGS, 'state', {
-                            get: () => handleTraceState,
-                            set: (newValue) => {
-                                handleTraceState = newValue;
-                            },
-                        });
-
-                        handleTrace(ARGS);
                     }
                 };
 

@@ -347,6 +347,10 @@ export interface TraceHandlerModuleExecutorArguments extends ScriptArguments {
      */
     readonly entry: TraceEntry;
     /**
+     * Save to trace list or not.
+     */
+    save: boolean;
+    /**
      * The current trace list.
      */
     readonly trace: TraceEntry[];
