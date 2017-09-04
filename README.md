@@ -126,6 +126,15 @@ exports.writeTrace = function(args) {
     // this function can be executed asynchronous
     // via a promise
 
+    // the final trace list is stored
+    // in 'args.trace' array
+    for (let i = 0; i < args.trace.length; i++) {
+        // s. https://mkloubert.github.io/vscode-proxy/interfaces/_contracts_.traceentry.html
+        let currentTraceEntry = args.trace[i];
+
+        //TODO
+    }
+
     // you can also access any NodeJS API
     // provided by Visual Studio Code
     // and the modules shipped with that extension
