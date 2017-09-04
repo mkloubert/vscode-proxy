@@ -188,7 +188,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
                 const WRITE_TO_OUTPUT = vsp_helpers.toBooleanSafe(
                     ME.entry.writeToOutput,
-                    vsp_helpers.toBooleanSafe(ME.controller.config.writeToOutput, true),
+                    vsp_helpers.toBooleanSafe(ME.controller.config.writeToOutput),
                 );
 
                 const HANDLE_ERROR = (err: any, source?: any) => {
@@ -221,35 +221,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     if (ME.isTracing) {
                         if (WRITE_TO_OUTPUT) {
                             try {
-                                const PROXY_NAME = vsp_helpers.getProxyName(
-                                    ME.entry.name,
-                                    ME.port,
-                                    ME.index + 1,
+                                ME.controller.outputChannel.append(
+                                    ME.traceEntryToString(newEntry),
                                 );
-
-                                let separator: string;
-                                let left: string;
-                                let right: string;
-                                switch (newEntry.destination) {
-                                    case vsp_contracts.ProxyDestination.ProxyToTarget:
-                                        separator = '=>';
-                                        left = `[${newEntry.sourceIndex}] '${newEntry.source.addr}:${newEntry.source.port}'`;
-                                        right = `[${newEntry.targetIndex}] '${newEntry.target.addr}:${newEntry.target.port}'`;
-                                        break;
-
-                                    case vsp_contracts.ProxyDestination.TargetToProxy:
-                                        separator = '<=';
-                                        right = `[${newEntry.sourceIndex}] '${newEntry.source.addr}:${newEntry.source.port}'`;
-                                        left = `[${newEntry.targetIndex}] '${newEntry.target.addr}:${newEntry.target.port}'`;
-                                        break;
-                                }
-
-                                ME.controller.outputChannel
-                                             .appendLine(`[TRACE] '${PROXY_NAME}': ${left} ${separator} ${right}`);
-                                if (newEntry.chunk) {
-                                    ME.controller.outputChannel
-                                                 .appendLine( Hexy.hexy(newEntry.chunk, { width: 16 }) );    
-                                }
                             }
                             catch (e) {
                                 console.trace('[Proxy] proxy.TcpProxy.start(write to output): ' +
@@ -498,6 +472,60 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
      */
     public get trace(): vsp_contracts.TraceEntry[] {
         return this._trace;
+    }
+
+    /**
+     * Converts a trace entry to a string.
+     * 
+     * @param {vsp_contracts.TraceEntry} entry The entry to convert.
+     * 
+     * @return {string} The entry as string.
+     */
+    public traceEntryToString(entry: vsp_contracts.TraceEntry) {
+        const ME = this;
+
+        let hexWidth = parseInt( vsp_helpers.toStringSafe(ME.controller.config.hexWidth) );
+        if (isNaN(hexWidth)) {
+            hexWidth = 16;
+        }
+        
+        let line = '';
+        const APPEND_LINE = (val: any) => {
+            line += vsp_helpers.toStringSafe(val);
+            line += "\n";
+        };
+
+        if (entry) {
+            const PROXY_NAME = vsp_helpers.getProxyName(
+                ME.entry.name,
+                ME.port,
+                ME.index + 1,
+            );
+
+            let separator: string;
+            let left: string;
+            let right: string;
+            switch (entry.destination) {
+                case vsp_contracts.ProxyDestination.ProxyToTarget:
+                    separator = '=>';
+                    left = `[${entry.sourceIndex}] '${entry.source.addr}:${entry.source.port}'`;
+                    right = `[${entry.targetIndex}] '${entry.target.addr}:${entry.target.port}'`;
+                    break;
+
+                case vsp_contracts.ProxyDestination.TargetToProxy:
+                    separator = '<=';
+                    right = `[${entry.sourceIndex}] '${entry.source.addr}:${entry.source.port}'`;
+                    left = `[${entry.targetIndex}] '${entry.target.addr}:${entry.target.port}'`;
+                    break;
+            }
+
+            APPEND_LINE(`[TRACE] '${PROXY_NAME}': ${left} ${separator} ${right}`);
+            if (entry.chunk) {
+                APPEND_LINE( Hexy.hexy(entry.chunk, { width: hexWidth }) );    
+            }
+        }
+
+        return line;
     }
 
     /**

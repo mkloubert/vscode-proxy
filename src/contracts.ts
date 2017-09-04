@@ -77,6 +77,14 @@ export interface ChunkHandlerModuleExecutorArguments extends ScriptArguments {
  */
 export interface Configuration extends vscode.WorkspaceConfiguration {
     /**
+     * The width for binary data in hex view.
+     */
+    readonly hexWidth?: number;
+    /**
+     * Default value that indicates if traces should be opened in new tab after trace has been finished or not.
+     */
+    readonly openAfterTrace?: boolean;
+    /**
      * One or more proxy entries.
      */
     readonly proxies?: { [port: string]: ProxyEntry; };
@@ -142,6 +150,10 @@ export interface ProxyEntry {
      * The name of the proxy.
      */
     readonly name?: string;
+    /**
+     * Open traces in new tab after trace has been finished or not.
+     */
+    readonly openAfterTrace?: boolean;
     /**
      * The custom list of targets (s. 'to') from where to send answers back
      * to the source / client or (true) or (false) to enable/disable that feature. Default: First target.

@@ -364,15 +364,18 @@ export class Controller implements vscode.Disposable {
      * Starts / stops tracing.
      */
     protected async trace() {
+        const ME = this;
+
         try {
-            await this.showProxyQuickPick('Select the proxy to trace...', async (proxies) => {
+            await ME.showProxyQuickPick('Select the proxy to trace...', async (proxies) => {
                 for (let i = 0; i < proxies.length; i++) {
                     const P = proxies[i];
 
+                    const IS_TRACING = P.isTracing;
                     const PROXY_NAME = vsp_helpers.getProxyName(P.entry.name, P.port, i + 1);
                     let errMsg: string;
                     try {
-                        if (P.isTracing) {
+                        if (IS_TRACING) {
                             errMsg = `Could not stop proxy tracing for '${PROXY_NAME}'`;
                         }
                         else {
@@ -380,8 +383,36 @@ export class Controller implements vscode.Disposable {
                         }
 
                         const TRACE = await P.toggleTrace();
-                        if (TRACE) {
-                            //TODO
+
+                        if (IS_TRACING) {
+                            // tracing has been finished
+
+                            const SHOW_IN_NEW_TAB = vsp_helpers.toBooleanSafe(P.entry.openAfterTrace,
+                                                                              vsp_helpers.toBooleanSafe(ME.config.openAfterTrace, true));
+
+                            if (SHOW_IN_NEW_TAB) {
+                                try {
+                                    const EDITOR = await vscode.window.showTextDocument(
+                                        await vscode.workspace.openTextDocument(),
+                                    );
+
+                                    const EOL = vsp_helpers.getEOL(EDITOR.document.eol);
+
+                                    const EDITOR_TEXT = TRACE.map(te => {
+                                        return P.traceEntryToString(te)
+                                                .split("\n").join(EOL);
+                                    }).join(EOL);
+
+                                    EDITOR.edit((builder) => {
+                                        builder.insert(new vscode.Position(0, 0),
+                                                       EDITOR_TEXT);
+                                    });
+                                }
+                                catch (e) {
+                                    console.trace('[Proxy] controller.trace(3): ' +
+                                                  vsp_helpers.toStringSafe(e));
+                                }
+                            }
                         }
                     }
                     catch (e) {

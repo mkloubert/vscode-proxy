@@ -22,6 +22,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 import * as FS from 'fs';
+import * as OS from 'os';
 import * as Path from 'path';
 import * as vscode from 'vscode';
 
@@ -113,6 +114,25 @@ export function distinctArray<T>(arr: T[]): T[] {
     return arr.filter((x, i) => {
         return arr.indexOf(x) === i;
     });
+}
+
+/**
+ * Returns the End-Of-Line sequence.
+ * 
+ * @param {vscode.EndOfLine} [eol] The optional editor value.
+ * 
+ * @return {string} The sequence.
+ */
+export function getEOL(eol?: vscode.EndOfLine): string {
+    switch (eol) {
+        case vscode.EndOfLine.CRLF:
+            return `\r\n`;
+        
+        case vscode.EndOfLine.LF:
+            return `\n`;
+    }
+    
+    return OS.EOL;
 }
 
 /**

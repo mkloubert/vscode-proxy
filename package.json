@@ -2,7 +2,7 @@
     "name": "vscode-proxy",
     "displayName": "Proxy",
     "description": "Runs TCP proxies with additional trace support.",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "publisher": "mkloubert",
     "engines": {
         "vscode": "^1.13.0"
@@ -40,6 +40,17 @@
                 "proxy": {
                     "type": "object",
                     "properties": {
+                        "hexWidth": {
+                            "description": "The width for binary data in hex view.",
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 16
+                        },
+                        "openAfterTrace": {
+                            "description": "Default value that indicates if traces should be opened in new tab after trace has been finished or not.",
+                            "type": "boolean",
+                            "default": true
+                        },
                         "proxies": {
                             "description": "One or more proxy entries.",
                             "type": "object",
@@ -67,6 +78,11 @@
                                         "name": {
                                             "description": "The name of the proxy.",
                                             "type": "string"
+                                        },
+                                        "openAfterTrace": {
+                                            "description": "Open traces in new tab after trace has been finished or not.",
+                                            "type": "boolean",
+                                            "default": true
                                         },
                                         "receiveChunksFrom": {
                                             "oneOf": [
@@ -103,18 +119,20 @@
                                             "oneOf": [
                                                 {
                                                     "description": "The target port.",
-                                                    "type": "number"    
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 65535    
                                                 },
                                                 {
                                                     "description": "The target address.",
-                                                    "type": "string"    
+                                                    "type": "string"
                                                 }
                                             ]
                                         },
                                         "writeToOutput": {
                                             "description": "Write trace entries to output or not.",
                                             "type": "boolean",
-                                            "default": true
+                                            "default": false
                                         }
                                     }
                                 }
@@ -123,7 +141,7 @@
                         "writeToOutput": {
                             "description": "Default value for writing trace entries to output or not.",
                             "type": "boolean",
-                            "default": true
+                            "default": false
                         }
                     }
                 }
