@@ -2,7 +2,7 @@
     "name": "vscode-proxy",
     "displayName": "Proxy",
     "description": "Runs TCP proxies with additional trace support.",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "publisher": "mkloubert",
     "engines": {
         "vscode": "^1.13.0"
@@ -51,6 +51,15 @@
                             "type": "boolean",
                             "default": true
                         },
+                        "outputFormat": {
+                            "description": "Default output format for traces.",
+                            "type": "string",
+                            "enum": [
+                                "",
+                                "json",
+                                "text"
+                            ]
+                        },
                         "proxies": {
                             "description": "One or more proxy entries.",
                             "type": "object",
@@ -83,6 +92,15 @@
                                             "description": "Open traces in new tab after trace has been finished or not.",
                                             "type": "boolean",
                                             "default": true
+                                        },
+                                        "outputFormat": {
+                                            "description": "Output format for traces.",
+                                            "type": "string",
+                                            "enum": [
+                                                "",
+                                                "json",
+                                                "text"
+                                            ]
                                         },
                                         "receiveChunksFrom": {
                                             "oneOf": [

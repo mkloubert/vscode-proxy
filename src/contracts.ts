@@ -85,6 +85,10 @@ export interface Configuration extends vscode.WorkspaceConfiguration {
      */
     readonly openAfterTrace?: boolean;
     /**
+     * Default output format for traces.
+     */
+    readonly outputFormat?: string;
+    /**
      * One or more proxy entries.
      */
     readonly proxies?: { [port: string]: ProxyEntry; };
@@ -154,6 +158,10 @@ export interface ProxyEntry {
      * Open traces in new tab after trace has been finished or not.
      */
     readonly openAfterTrace?: boolean;
+    /**
+     * Output format for traces.
+     */
+    readonly outputFormat?: string;
     /**
      * The custom list of targets (s. 'to') from where to send answers back
      * to the source / client or (true) or (false) to enable/disable that feature. Default: First target.

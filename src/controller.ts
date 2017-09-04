@@ -392,21 +392,35 @@ export class Controller implements vscode.Disposable {
 
                             if (SHOW_IN_NEW_TAB) {
                                 try {
+                                    const EOL = "\n";
+
+                                    let outputFormat = vsp_helpers.normalizeString(P.entry.outputFormat);
+                                    if ('' === outputFormat) {
+                                        outputFormat = vsp_helpers.normalizeString(ME.config.outputFormat);
+                                    }
+                                    
+                                    let editorText: string;
+                                    let lang: string;
+                                    switch (outputFormat) {
+                                        case 'json':
+                                            editorText = JSON.stringify(TRACE, null, 2);
+                                            lang = 'json';
+                                            break;
+
+                                        default:
+                                            editorText = TRACE.map(te => {
+                                                return P.traceEntryToString(te)
+                                                        .split("\n").join(EOL);
+                                            }).join(EOL);
+                                            break;
+                                    }
+
                                     const EDITOR = await vscode.window.showTextDocument(
-                                        await vscode.workspace.openTextDocument(),
+                                        await vscode.workspace.openTextDocument({
+                                            language: lang,
+                                            content: editorText,
+                                        }),
                                     );
-
-                                    const EOL = vsp_helpers.getEOL(EDITOR.document.eol);
-
-                                    const EDITOR_TEXT = TRACE.map(te => {
-                                        return P.traceEntryToString(te)
-                                                .split("\n").join(EOL);
-                                    }).join(EOL);
-
-                                    EDITOR.edit((builder) => {
-                                        builder.insert(new vscode.Position(0, 0),
-                                                       EDITOR_TEXT);
-                                    });
                                 }
                                 catch (e) {
                                     console.trace('[Proxy] controller.trace(3): ' +

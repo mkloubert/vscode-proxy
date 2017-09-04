@@ -296,6 +296,22 @@ export function loadModule<TModule>(file: string, useCache: boolean = false): TM
 }
 
 /**
+ * Normalizes a value as string so that is comparable.
+ * 
+ * @param {any} val The value to convert.
+ * @param {(str: string) => string} [normalizer] The custom normalizer.
+ * 
+ * @return {string} The normalized value.
+ */
+export function normalizeString(val: any, normalizer?: (str: string) => string): string {
+    if (!normalizer) {
+        normalizer = (str) => str.toLowerCase().trim();
+    }
+
+    return normalizer(toStringSafe(val));
+}
+
+/**
  * Creates a read-only version of an object.
  * 
  * @param {T} baseObj The base object.
