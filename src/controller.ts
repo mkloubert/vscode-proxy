@@ -198,36 +198,49 @@ export class Controller implements vscode.Disposable {
 
         const ENTRIES = this.getProxyEntries();
         for (let i = 0; i < ENTRIES.length; i++) {
-            const E = ENTRIES[i];
+            const PROXY_ENTRY = ENTRIES[i];
 
-            const NEW_PROXY = new vsp_proxy.TcpProxy(this,
-                                                     E.port,
-                                                     E.entry, i);
-            this._PROXIES.push(NEW_PROXY);
+            const PROXY_NAME = vsp_helpers.getProxyName(PROXY_ENTRY.entry.name,
+                                                        PROXY_ENTRY.port, 
+                                                        i + 1);
 
-            const PROXY_NAME = vsp_helpers.getProxyName(E.entry.name, E.port, i + 1);
+            try {
+                const NEW_PROXY = new vsp_proxy.TcpProxy(this,
+                                                         PROXY_ENTRY.port,
+                                                         PROXY_ENTRY.entry, i);
+                await NEW_PROXY.init();
 
-            if (vsp_helpers.toBooleanSafe(NEW_PROXY.entry.autoStart)) {
-                try {
-                    if (!(await NEW_PROXY.start())) {
-                        // already running
+                this._PROXIES.push(NEW_PROXY);
 
-                        vscode.window.showWarningMessage(`[Proxy] Proxy '${PROXY_NAME}' already running.`).then(() => {
+                if (vsp_helpers.toBooleanSafe(NEW_PROXY.entry.autoStart)) {
+                    try {
+                        if (!(await NEW_PROXY.start())) {
+                            // already running
+
+                            vscode.window.showWarningMessage(`[Proxy] Proxy '${PROXY_NAME}' already running.`).then(() => {
+                            }, (err) => {
+                                console.trace('[Proxy] controller.reloadProxies(3): ' +
+                                              vsp_helpers.toStringSafe(err));
+                            });
+                        }
+                    }
+                    catch (e) {
+                        // autostart failed
+
+                        vscode.window.showErrorMessage(`[Proxy] Could not autostart proxy '${PROXY_NAME}': ${vsp_helpers.toStringSafe(e)}}`).then(() => {
                         }, (err) => {
                             console.trace('[Proxy] controller.reloadProxies(2): ' +
                                           vsp_helpers.toStringSafe(err));
                         });
                     }
                 }
-                catch (e) {
-                    // autostart failed
-
-                    vscode.window.showErrorMessage(`[Proxy] Could not autostart proxy '${PROXY_NAME}': ${vsp_helpers.toStringSafe(e)}}`).then(() => {
-                    }, (err) => {
-                        console.trace('[Proxy] controller.reloadProxies(1): ' +
-                                      vsp_helpers.toStringSafe(err));
-                    });
-                }
+            }
+            catch (e) {
+                vscode.window.showErrorMessage(`[Proxy] Could not load proxy '${PROXY_NAME}': ${vsp_helpers.toStringSafe(e)}}`).then(() => {
+                }, (err) => {
+                    console.trace('[Proxy] controller.reloadProxies(1): ' +
+                                  vsp_helpers.toStringSafe(err));
+                });
             }
         }
     }
@@ -258,7 +271,7 @@ export class Controller implements vscode.Disposable {
 
             let description = vsp_helpers.toStringSafe(ENTRY.description).trim();
 
-            let name = vsp_helpers.getProxyName(ENTRY.name, PORT, i + 1);
+            let name = p.name;
 
             if (iconResolver) {
                 const ICON = vsp_helpers.toStringSafe(
@@ -321,16 +334,15 @@ export class Controller implements vscode.Disposable {
                 for (let i = 0; i < proxies.length; i++) {
                     const P = proxies[i];
 
-                    const PROXY_NAME = vsp_helpers.getProxyName(P.entry.name, P.port, i + 1);
                     let errMsg: string;
                     try {
                         if (P.isRunning) {
-                            errMsg = `Could not stop proxy '${PROXY_NAME}'`;
+                            errMsg = `Could not stop proxy '${P.name}'`;
 
                             await P.stop();
                         }
                         else {
-                            errMsg = `Could not start proxy '${PROXY_NAME}'`;
+                            errMsg = `Could not start proxy '${P.name}'`;
 
                             await P.start();
                         }
@@ -372,62 +384,16 @@ export class Controller implements vscode.Disposable {
                     const P = proxies[i];
 
                     const IS_TRACING = P.isTracing;
-                    const PROXY_NAME = vsp_helpers.getProxyName(P.entry.name, P.port, i + 1);
                     let errMsg: string;
                     try {
                         if (IS_TRACING) {
-                            errMsg = `Could not stop proxy tracing for '${PROXY_NAME}'`;
+                            errMsg = `Could not stop proxy tracing for '${P.name}'`;
                         }
                         else {
-                            errMsg = `Could not start proxy tracing for '${PROXY_NAME}'`;
+                            errMsg = `Could not start proxy tracing for '${P.name}'`;
                         }
 
-                        const TRACE = await P.toggleTrace();
-
-                        if (IS_TRACING) {
-                            // tracing has been finished
-
-                            const SHOW_IN_NEW_TAB = vsp_helpers.toBooleanSafe(P.entry.openAfterTrace,
-                                                                              vsp_helpers.toBooleanSafe(ME.config.openAfterTrace, true));
-
-                            if (SHOW_IN_NEW_TAB) {
-                                try {
-                                    const EOL = "\n";
-
-                                    let outputFormat = vsp_helpers.normalizeString(P.entry.outputFormat);
-                                    if ('' === outputFormat) {
-                                        outputFormat = vsp_helpers.normalizeString(ME.config.outputFormat);
-                                    }
-                                    
-                                    let editorText: string;
-                                    let lang: string;
-                                    switch (outputFormat) {
-                                        case 'json':
-                                            editorText = JSON.stringify(TRACE, null, 2);
-                                            lang = 'json';
-                                            break;
-
-                                        default:
-                                            editorText = TRACE.map(te => {
-                                                return P.traceEntryToString(te)
-                                                        .split("\n").join(EOL);
-                                            }).join(EOL);
-                                            break;
-                                    }
-
-                                    const EDITOR = await vscode.window.showTextDocument(
-                                        await vscode.workspace.openTextDocument({
-                                            language: lang,
-                                            content: editorText,
-                                        }),
-                                    );
-                                }
-                                catch (e) {
-                                    console.trace('[Proxy] controller.trace(3): ' +
-                                                  vsp_helpers.toStringSafe(e));
-                                }
-                            }
-                        }
+                        await P.toggleTrace();
                     }
                     catch (e) {
                         // failed toggle tracing

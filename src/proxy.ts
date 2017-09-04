@@ -37,16 +37,28 @@ interface EntryWithSocket {
     readonly socket: Net.Socket;
 }
 
+interface ProxyStatistics {
+    bytesReceived: number;
+    bytesSend: number;
+}
+
+
+let nextCommandsId = -1;
 
 /**
  * A TCP proxy.
  */
 export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
+    private _button: vscode.StatusBarItem;
+    private _buttonCommand: vscode.Disposable;
+    private readonly _COMMANDS_ID = ++nextCommandsId;
     private readonly _CONTROLLER: vsp_controller.Controller;
     private readonly _ENTRY: vsp_contracts.ProxyEntry;
     private readonly _INDEX: number;
+    private _isInitialized = false;
     private readonly _PORT: number;
     private _server: Net.Server;
+    private _statistics: ProxyStatistics;
     private _trace: vsp_contracts.TraceEntry[];
 
     /**
@@ -79,10 +91,16 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     public dispose() {
         this.removeAllListeners();
 
+        vsp_helpers.tryDispose(this._button);
+        vsp_helpers.tryDispose(this._buttonCommand);
+
         const OLD_SERVER = this._server;
         if (OLD_SERVER) {
             OLD_SERVER.close();
         }
+
+        this._button = null;
+        this._buttonCommand = null;
 
         this._server = null;
     }
@@ -102,6 +120,47 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     }
 
     /**
+     * Initailizes that proxy.
+     */
+    public async init() {
+        const ME = this;
+
+        if (ME.isInitialized) {
+            return;
+        }
+
+        // toggle trace button
+        try {
+            const CMD = `extension.proxy.proxies${ME._COMMANDS_ID}.showTraceActions`;
+
+            ME._buttonCommand = vscode.commands.registerCommand(CMD, async () => {
+                await ME.showTraceActions();
+            });
+
+            ME._button = vscode.window.createStatusBarItem();
+            ME._button.command = CMD;
+            ME._button.show();
+
+            ME.updateButton();
+        }
+        catch (e) {
+            vsp_helpers.tryDispose(ME._button);
+            vsp_helpers.tryDispose(ME._buttonCommand);
+
+            throw e;
+        }
+
+        ME._isInitialized = true;
+    }
+
+    /**
+     * Gets if the proxy has been initialized or not.
+     */
+    public get isInitialized() {
+        return this._isInitialized;
+    }
+
+    /**
      * Gets if proxy is running or not.
      */
     public get isRunning() {
@@ -116,10 +175,161 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     }
 
     /**
+     * Gets the (display) name of that proxy.
+     */
+    public get name(): string {
+        return vsp_helpers.getProxyName(
+            this.entry.name,
+            this.port,
+            this.index + 1,
+        );
+    }
+
+    /**
+     * Opens all trace items or a specific one in a new tab.
+     * 
+     * @param {number} [index] The zero-based index of the specific one.
+     */
+    public async openTraceInNewTab(index?: number) {
+        const ME = this;
+
+        const ALL_TRACE = this._trace;
+        if (!ALL_TRACE) {
+            return;
+        }
+
+        let trace: vsp_contracts.TraceEntry[];
+        if (isNaN(index)) {
+            trace = ALL_TRACE;
+        }
+        else {
+            trace = [ ALL_TRACE[index] ];
+        }
+
+        const SHOW_IN_NEW_TAB = vsp_helpers.toBooleanSafe(ME.entry.openAfterTrace,
+                                                          vsp_helpers.toBooleanSafe(ME.controller.config.openAfterTrace, true));
+
+        if (!SHOW_IN_NEW_TAB) {
+            return;
+        }
+
+        try {
+            const EOL = "\n";
+
+            let outputFormat = vsp_helpers.normalizeString(ME.entry.outputFormat);
+            if ('' === outputFormat) {
+                outputFormat = vsp_helpers.normalizeString(ME.controller.config.outputFormat);
+            }
+            
+            let editorText: string;
+            let lang = '';
+            switch (outputFormat) {
+                case 'json':
+                    editorText = JSON.stringify(trace, null, 2);
+                    lang = 'json';
+                    break;
+
+                default:
+                    editorText = trace.map(te => {
+                        return ME.traceEntryToString(te)
+                                 .split("\n").join(EOL);
+                    }).join(EOL);
+                    break;
+            }
+
+            const EDITOR = await vscode.window.showTextDocument(
+                await vscode.workspace.openTextDocument({
+                    language: lang,
+                    content: editorText,
+                }),
+            );
+        }
+        catch (e) {
+            console.trace('[Proxy] controller.openTraceInNewTab(): ' +
+                            vsp_helpers.toStringSafe(e));
+        }
+    }
+
+    /**
      * The TCP port.
      */
     public get port(): number {
         return this._PORT;
+    }
+
+    public async showTraceActions() {
+        const ME = this;
+
+        try {
+            const QUICK_PICKS: vsp_contracts.ActionQuickPickItem[] = [];
+
+            const IS_TRACING = ME.isTracing;
+            const TRACE = (ME.trace || []).map((te, i) => {
+                return {
+                    entry: te,
+                    index: i,
+                };
+            });
+            {
+                if (IS_TRACING) {
+                    TRACE.sort((x, y) => {
+                        return vsp_helpers.compareValuesBy(y, x,
+                                                           i => i.index);
+                    }).forEach(x => {
+                        let traceDescription: string;
+
+                        let traceLabel = `[${x.index + 1}] ${x.entry.time.format('YYYY-MM-DD HH:mm:ss.SSS')}`;
+
+                        QUICK_PICKS.push({
+                            description: traceDescription,
+                            label: traceLabel,
+                            action: async () => {
+                                await ME.openTraceInNewTab(x.index);
+                            }
+                        });
+                    });
+                }
+
+                // toggle tracing
+                {
+                    let label: string;
+                    if (IS_TRACING) {
+                        label = '$(primitive-square)  Stop tracing...';
+                    }
+                    else {
+                        label = '$(triangle-right)  Start tracing...';
+                    }
+    
+                    QUICK_PICKS.push({
+                        description: '',
+                        label: label,
+                        action: async () => {
+                            await ME.toggleTrace();
+                        }
+                    });
+                }
+
+                let selectedItem: vsp_contracts.ActionQuickPickItem;
+                if (IS_TRACING) {
+                    selectedItem = await vscode.window.showQuickPick(QUICK_PICKS);
+                }
+                else {
+                    selectedItem = QUICK_PICKS[0];
+                }
+
+                if (selectedItem) {
+                    if (selectedItem.action) {
+                        await Promise.resolve(
+                            selectedItem.action(selectedItem.state,
+                                                selectedItem),
+                        );
+                    }
+                }
+            }
+        }
+        catch (e) {
+            console.trace(`[Proxy] TcpProxy.showTraceActions()`);
+        }
     }
 
     /**
@@ -263,6 +473,10 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 };
 
                 let newServer: Net.Server;
+                const NEW_STATS: ProxyStatistics = {
+                    bytesReceived: 0,
+                    bytesSend: 0,
+                };
 
                 newServer = Net.createServer((from) => {
                     try {
@@ -326,6 +540,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                                 from.write(chunk);  // send "answer"
 
                                                 chunkSend = true;
+
+                                                NEW_STATS.bytesReceived += chunk.length;
+                                                ME.updateButton();
                                             }
                                             catch (e) {
                                                 e = err;
@@ -381,6 +598,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                             t.socket.write(chunk);  // send "request"
 
                                             chunkSend = true;
+
+                                            NEW_STATS.bytesSend += chunk.length;
+                                            ME.updateButton();
                                         }
                                         catch (e) {
                                             err = e;
@@ -426,6 +646,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 });
                 
                 newServer.listen(SOURCE, () => {
+                    ME._statistics = NEW_STATS;
                     ME._server = newServer;
 
                     COMPLETED(null, true);
@@ -496,12 +717,6 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
         };
 
         if (entry) {
-            const PROXY_NAME = vsp_helpers.getProxyName(
-                ME.entry.name,
-                ME.port,
-                ME.index + 1,
-            );
-
             let separator: string;
             let left: string;
             let right: string;
@@ -519,7 +734,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     break;
             }
 
-            APPEND_LINE(`[TRACE] '${PROXY_NAME}': ${left} ${separator} ${right}`);
+            APPEND_LINE(`[TRACE] '${ME.name}': ${left} ${separator} ${right}`);
             if (entry.chunk) {
                 APPEND_LINE( Hexy.hexy(entry.chunk, { width: hexWidth }) );    
             }
@@ -557,6 +772,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     }
                 }
             }
+            
+            await this.openTraceInNewTab();
 
             this._trace = null;
         }
@@ -564,6 +781,46 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             trace = this._trace = [];
         }
 
+        this.updateButton();
+
         return trace;
+    }
+
+    /**
+     * Updates the underlying button.
+     */
+    protected updateButton() {
+        const BTN = this._button;
+        if (!BTN) {
+            return;
+        }
+
+        let text = this.name;
+
+        let color: string;
+        if (this.isTracing) {
+            color = '#ffff00';
+        }
+        else {
+            color = '#ffffff';
+        }
+
+        let tooltip: string;
+
+        const STATS = this._statistics;
+        if (STATS) {
+            tooltip = `Send: ${STATS.bytesSend}
+Received: ${STATS.bytesReceived}`;
+        }
+
+        if (BTN.text !== text) {
+            BTN.text = text;
+        }
+        if (BTN.tooltip !== tooltip) {
+            BTN.tooltip = tooltip;
+        }
+        if (BTN.color !== color) {
+            BTN.color = color;
+        }
     }
 }
