@@ -69,6 +69,7 @@ The following example registers a proxy at port `80` and sends all data to `8080
 | `autoStart` | Start proxy on startup or not. Default: `(false)` |
 | `chunkHandler` | The path to [the script](#chunk-handlers-) that handles a chunk. |
 | `chunkHandlerOptions` | Additional options for the [chunk handler](#chunk-handlers-). |
+| `chunkHandlerState` | Initial state value for the [chunk handler](#chunk-handlers-). |
 | `description` | An additional description for the proxy. |
 | `name` | The name of the proxy. |
 | `openAfterTrace` | Open traces in new tab after trace has been finished or not. Default: `(true)` |
@@ -76,8 +77,10 @@ The following example registers a proxy at port `80` and sends all data to `8080
 | `receiveChunksFrom` | The custom list of targets (s. 'to') from where to send answers back to the source / client or (true) or (false) to enable/disable that feature. Default: First target. |
 | `traceHandler` | The path to [the script](#trace-handlers-) that handles a (new) trace entry. |
 | `traceHandlerOptions` | Additional options for the [trace handler](#trace-handlers-). |
+| `traceHandlerState` | Initial state value for the [trace handler](#trace-handlers-). |
 | `traceWriter` | The path to [the script](#trace-writers-) that writes a trace list, when tracing is stopped. |
 | `traceWriterOptions` | Additional options for the [trace writer](#trace-writers-). |
+| `traceWriterState` | Initial state value for the [trace writer](#trace-writers-). |
 | `to` | The destination port(s) or address(es). |
 | `writeToOutput` | Write trace entries to output or not. Default: `(false)` |
 
@@ -91,6 +94,11 @@ exports.handleChunk = function(args) {
     // data, which should be send to the target
     // 
     // (undefined) or (null) will NOT send data to the target
+
+    // you can also access any NodeJS API
+    // provided by Visual Studio Code
+    // and the modules shipped with that extension
+    // (s. https://github.com/mkloubert/vscode-proxy/blob/master/package.json)
 };
 ```
 
@@ -101,6 +109,11 @@ exports.handleChunk = function(args) {
 ```javascript
 exports.handleTrace = function(args) {
     // this function is executed synchronous
+
+    // you can also access any NodeJS API
+    // provided by Visual Studio Code
+    // and the modules shipped with that extension
+    // (s. https://github.com/mkloubert/vscode-proxy/blob/master/package.json)
 };
 ```
 
@@ -112,6 +125,11 @@ exports.handleTrace = function(args) {
 exports.writeTrace = function(args) {
     // this function can be executed asynchronous
     // via a promise
+
+    // you can also access any NodeJS API
+    // provided by Visual Studio Code
+    // and the modules shipped with that extension
+    // (s. https://github.com/mkloubert/vscode-proxy/blob/master/package.json)
 };
 ```
 

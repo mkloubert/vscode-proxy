@@ -151,6 +151,10 @@ export interface ProxyEntry {
      */
     readonly chunkHandlerOptions?: any;
     /**
+     * Initial state value for the "chunk handler".
+     */
+    readonly chunkHandlerState?: any;
+    /**
      * An additional description for the proxy.
      */
     readonly description?: string;
@@ -180,6 +184,10 @@ export interface ProxyEntry {
      */
     readonly traceHandlerOptions?: any;
     /**
+     * Initial state value for the "trace handler".
+     */
+    readonly traceHandlerState?: any;
+    /**
      * The path to the script that writes a trace list, when tracing is stopped.
      */
     readonly traceWriter?: string;
@@ -187,6 +195,10 @@ export interface ProxyEntry {
      * Additional options for the "trace writer".
      */
     readonly traceWriterOptions?: any;
+    /**
+     * Initial state value for the "trace writer".
+     */
+    readonly traceWriterState?: any;
     /**
      * The destination port(s) or address(es).
      */
@@ -207,13 +219,37 @@ export type ProxyTarget = string | number;
  */
 export interface ScriptArguments {
     /**
+     * The extension configuration.
+     */
+    readonly config: Configuration;
+    /**
+     * The context of the extension.
+     */
+    readonly context: vscode.ExtensionContext;
+    /**
      * Global options / data from the settings.
      */
     readonly globals: any;
     /**
+     * The global state for this and all other scripts.
+     */
+    readonly globalState: Object;
+    /**
      * Additional options for the script.
      */
     readonly options?: any;
+    /**
+     * The package file.
+     */
+    readonly packageFile: PackageFile;
+    /**
+     * The output channel of the extension.
+     */
+    readonly outputChannel: vscode.OutputChannel;
+    /**
+     * Gets or sets a state value for the underlying script.
+     */
+    state: any;
 }
 
 /**

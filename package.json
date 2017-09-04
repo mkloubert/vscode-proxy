@@ -2,7 +2,7 @@
     "name": "vscode-proxy",
     "displayName": "Proxy",
     "description": "Runs TCP proxies with additional trace support.",
-    "version": "0.10.0",
+    "version": "0.11.0",
     "publisher": "mkloubert",
     "engines": {
         "vscode": "^1.13.0"
@@ -85,6 +85,9 @@
                                         "chunkHandlerOptions": {
                                             "description": "Additional options for the 'chunk handler'."
                                         },
+                                        "chunkHandlerState": {
+                                            "description": "Initial state value for the 'chunk handler'."
+                                        },
                                         "description": {
                                             "description": "An additional description for the proxy.",
                                             "type": "string"
@@ -131,12 +134,18 @@
                                         "traceHandlerOptions": {
                                             "description": "Additional options for the 'trace handler'."
                                         },
+                                        "traceHandlerState": {
+                                            "description": "Initial state value for the 'trace handler'."
+                                        },
                                         "traceWriter": {
                                             "description": "The path to the script that writes a trace list, when tracing is stopped.",
                                             "type": "string"
                                         },
                                         "traceWriterOptions": {
                                             "description": "Additional options for the 'trace writer'."
+                                        },
+                                        "traceWriterState": {
+                                            "description": "Initial state value for the 'trace writer'."
                                         },
                                         "to": {
                                             "oneOf":[

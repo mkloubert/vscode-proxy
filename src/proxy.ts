@@ -75,12 +75,14 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     private readonly _COMMANDS_ID = ++nextCommandsId;
     private readonly _CONTROLLER: vsp_controller.Controller;
     private readonly _ENTRY: vsp_contracts.ProxyEntry;
+    private _globalScriptState: Object;
     private readonly _INDEX: number;
     private _isInitialized = false;
     private readonly _PORT: number;
     private _server: Net.Server;
     private _statistics: ProxyStatistics;
     private _trace: vsp_contracts.TraceEntry[];
+    private _traceWriterState: any;
 
     /**
      * Initializes a new instance of that class.
@@ -315,6 +317,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
         return this._PORT;
     }
 
+    /**
+     * Shows trace actions.
+     */
     public async showTraceActions() {
         const ME = this;
 
@@ -418,6 +423,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             }
 
             try {
+                const CFG = vsp_helpers.cloneObject(ME.controller.config);
+                const PKG_FILE = vsp_helpers.cloneObject(ME.controller.packageFile);
+
                 const SOURCE = vsp_helpers.getPortSafe(ME.port, 8081);
                 const TARGETS = vsp_helpers.asArray(ME.entry.to).filter(t => {
                     return !vsp_helpers.isNullOrUndefined(t);
@@ -446,6 +454,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 let handleTraceOptions = vsp_helpers.cloneObject(
                     this.entry.traceHandlerOptions,
                 );
+                let handleTraceState = vsp_helpers.cloneObject(
+                    this.entry.traceHandlerState
+                );
                 if (!vsp_helpers.isEmptyString(this.entry.traceHandler)) {
                     const HANDLER_MODULE = vsp_helpers.loadModule<vsp_contracts.TraceHandlerModule>(this.entry.traceHandler);
                     if (HANDLER_MODULE) {
@@ -458,6 +469,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 let handleChunkOptions = vsp_helpers.cloneObject(
                     this.entry.chunkHandlerOptions,
                 );
+                let handleChunkState = vsp_helpers.cloneObject(
+                    this.entry.chunkHandlerState
+                );
                 if (!vsp_helpers.isEmptyString(this.entry.chunkHandler)) {
                     const HANDLER_MODULE = vsp_helpers.loadModule<vsp_contracts.ChunkHandlerModule>(this.entry.chunkHandler);
                     if (HANDLER_MODULE) {
@@ -467,10 +481,10 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
                 const WRITE_TO_OUTPUT = vsp_helpers.toBooleanSafe(
                     ME.entry.writeToOutput,
-                    vsp_helpers.toBooleanSafe(ME.controller.config.writeToOutput),
+                    vsp_helpers.toBooleanSafe(CFG.writeToOutput),
                 );
 
-                const GLOBALS = vsp_helpers.cloneObject(this.controller.config.globals);
+                const GLOBALS = vsp_helpers.cloneObject(CFG.globals);
 
                 const HANDLE_ERROR = (err: any, source?: any) => {
                     if (!err) {
@@ -516,11 +530,25 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     // trace handler
                     if (handleTrace) {
                         const ARGS: vsp_contracts.TraceHandlerModuleExecutorArguments = {
+                            config: CFG,
+                            context: ME.controller.context,
                             entry: newEntry,
                             globals: GLOBALS,
+                            globalState: ME._globalScriptState,
                             options: handleTraceOptions,
+                            outputChannel: ME.controller.outputChannel,
+                            packageFile: PKG_FILE,
+                            state: undefined,
                             trace: TRACE,
                         };
+
+                        // ARGS.state
+                        Object.defineProperty(ARGS, 'state', {
+                            get: () => handleTraceState,
+                            set: (newValue) => {
+                                handleTraceState = newValue;
+                            },
+                        });
 
                         handleTrace(ARGS);
                     }
@@ -533,9 +561,23 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     if (handleChunk) {
                         const ARGS: vsp_contracts.ChunkHandlerModuleExecutorArguments = {
                             chunk: chunk,
+                            config: CFG,
+                            context: ME.controller.context,
                             globals: GLOBALS,
+                            globalState: ME._globalScriptState,
                             options: handleChunkOptions,
+                            outputChannel: ME.controller.outputChannel,
+                            packageFile: PKG_FILE,
+                            state: undefined,
                         };
+
+                        // ARGS.state
+                        Object.defineProperty(ARGS, 'state', {
+                            get: () => handleChunkState,
+                            set: (newValue) => {
+                                handleChunkState = newValue;
+                            },
+                        });
         
                         handleChunk(ARGS);
 
@@ -738,6 +780,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 
                 newServer.listen(SOURCE, () => {
                     ME._statistics = NEW_STATS;
+                    ME._globalScriptState = {};
+                    ME._traceWriterState = vsp_helpers.cloneObject(ME.entry.traceWriterState);
                     ME._server = newServer;
 
                     ME.updateButton();
@@ -775,6 +819,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     ME.updateButton();
 
                     ME._server = null;
+                    ME._globalScriptState = null;
+                    ME._traceWriterState = null;
 
                     COMPLETED(null, true);
                 });
@@ -846,23 +892,39 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
      * @return {Promise<TraceEntry[]>} The promise with the current trace.
      */
     public async toggleTrace() {
+        const ME = this;
+
         let trace: vsp_contracts.TraceEntry[];
         
-        if (this.isTracing) {
-            trace = this.trace;
+        if (ME.isTracing) {
+            trace = ME.trace;
 
-            if (!vsp_helpers.isEmptyString(this.entry.traceWriter)) {
+            if (!vsp_helpers.isEmptyString(ME.entry.traceWriter)) {
                 const ARGS: vsp_contracts.TraceWriterModuleExecutorArguments = {
+                    config: vsp_helpers.cloneObject(ME.controller.config),
+                    context: ME.controller.context,
                     globals: vsp_helpers.cloneObject(
-                        this.controller.config.globals
+                        ME.controller.config.globals
                     ),
+                    globalState: ME._globalScriptState,
                     options: vsp_helpers.cloneObject(
-                        this.entry.traceWriterOptions,
+                        ME.entry.traceWriterOptions,
                     ),
+                    outputChannel: ME.controller.outputChannel,
+                    packageFile: vsp_helpers.cloneObject(ME.controller.packageFile),
+                    state: undefined,
                     trace: trace,
                 };
 
-                const WRITER_MODULE = vsp_helpers.loadModule<vsp_contracts.TraceWriterModule>(this.entry.traceWriter);
+                // ARGS.state
+                Object.defineProperty(ARGS, 'state', {
+                    get: () => ME._traceWriterState,
+                    set: (newValue) => {
+                        ME._traceWriterState = newValue;
+                    },
+                });
+
+                const WRITER_MODULE = vsp_helpers.loadModule<vsp_contracts.TraceWriterModule>(ME.entry.traceWriter);
                 if (WRITER_MODULE) {
                     const WRITE_TRACE = WRITER_MODULE.writeTrace;
                     if (WRITE_TRACE) {
@@ -873,15 +935,15 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 }
             }
             
-            await this.openTraceInNewTab();
+            await ME.openTraceInNewTab();
 
-            this._trace = null;
+            ME._trace = null;
         }
         else {
-            trace = this._trace = [];
+            trace = ME._trace = [];
         }
 
-        this.updateButton();
+        ME.updateButton();
 
         return trace;
     }
