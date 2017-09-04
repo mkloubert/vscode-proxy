@@ -21,6 +21,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+import * as Moment from 'moment';
+import * as Net from 'net';
 import * as vscode from 'vscode';
 
 
@@ -78,6 +80,10 @@ export interface Configuration extends vscode.WorkspaceConfiguration {
      * One or more proxy entries.
      */
     readonly proxies?: { [port: string]: ProxyEntry; };
+    /**
+     * Default value for writing trace entries to output or not.
+     */
+    readonly writeToOutput?: boolean;
 }
 
 /**
@@ -138,9 +144,9 @@ export interface ProxyEntry {
     readonly name?: string;
     /**
      * The custom list of targets (s. 'to') from where to send answers back
-     * to the source / client or (false) to disable that feature. Default: First target.
+     * to the source / client or (true) or (false) to enable/disable that feature. Default: First target.
      */
-    readonly receiveChunksFrom?: false | number | number[];
+    readonly receiveChunksFrom?: boolean | number | number[];
     /**
      * The path to the script that handles a (new) trace entry.
      */
@@ -161,6 +167,10 @@ export interface ProxyEntry {
      * The destination port(s) or address(es).
      */
     readonly to?: ProxyTarget | ProxyTarget[];
+    /**
+     * Write trace entries to output or not.
+     */
+    readonly writeToOutput?: boolean;
 }
 
 /**
@@ -201,21 +211,37 @@ export interface TraceEntry {
      */
     readonly chunk: Buffer;
     /**
+     * Chunk has been send to target or not.
+     */
+    readonly chunkSend: boolean;
+    /**
      * The destination.
      */
     readonly destination: ProxyDestination;
     /**
      * The error (if occurred).
      */
-    readonly err?: any;
+    readonly error?: any;
     /**
      * The source address.
      */
     readonly source: SocketAddress;
     /**
+     * The zero-based index of the source socket.
+     */
+    readonly sourceIndex: number;
+    /**
      * The target address.
      */
     readonly target: SocketAddress;
+    /**
+     * The zero-based index of the target socket.
+     */
+    readonly targetIndex: number;
+    /**
+     * The timestamp.
+     */
+    readonly time: Moment.Moment;
 }
 
 /**

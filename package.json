@@ -2,7 +2,7 @@
     "name": "vscode-proxy",
     "displayName": "Proxy",
     "description": "Runs TCP proxies with additional trace support.",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "publisher": "mkloubert",
     "engines": {
         "vscode": "^1.13.0"
@@ -23,15 +23,112 @@
     ],
     "main": "./out/src/extension",
     "contributes": {
-        "commands": [{
-            "command": "extension.proxy.startStop",
-            "title": "Start / stop",
-            "category": "Proxy"
-        },{
-            "command": "extension.proxy.trace",
-            "title": "Trace",
-            "category": "Proxy"
-        }]
+        "commands": [
+            {
+                "command": "extension.proxy.startStop",
+                "title": "Start / stop",
+                "category": "Proxy"
+            },
+            {
+                "command": "extension.proxy.trace",
+                "title": "Trace",
+                "category": "Proxy"
+            }
+        ],
+        "configuration": {
+            "properties": {
+                "proxy": {
+                    "type": "object",
+                    "properties": {
+                        "proxies": {
+                            "description": "One or more proxy entries.",
+                            "type": "object",
+                            "patternProperties": {
+                                "\\d+": {
+                                    "description": "A proxy entry",
+                                    "type": "object",
+                                    "properties": {
+                                        "autoStart": {
+                                            "description": "Start proxy on startup or not.",
+                                            "type": "boolean",
+                                            "default": false
+                                        },
+                                        "chunkHandler": {
+                                            "description": "The path to the script that handles a chunk.",
+                                            "type": "string"
+                                        },
+                                        "chunkHandlerOptions": {
+                                            "description": "Additional options for the 'chunk handler'."
+                                        },
+                                        "description": {
+                                            "description": "An additional description for the proxy.",
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "description": "The name of the proxy.",
+                                            "type": "string"
+                                        },
+                                        "receiveChunksFrom": {
+                                            "oneOf": [
+                                                {
+                                                    "description": "Send answers back to source / client or not.",
+                                                    "type": "boolean"
+                                                },
+                                                {
+                                                    "description": "One or more zero-based indexes of targets from where sending back answers to source / client.",
+                                                    "type": "array"
+                                                }
+                                            ],
+                                            "default": [
+                                                0
+                                            ]
+                                        },
+                                        "traceHandler": {
+                                            "description": "The path to the script that handles a (new) trace entry.",
+                                            "type": "string"
+                                        },
+                                        "traceHandlerOptions": {
+                                            "description": "Additional options for the 'trace handler'."
+                                        },
+                                        "traceWriter": {
+                                            "description": "The path to the script that writes a trace list, when tracing is stopped.",
+                                            "type": "string"
+                                        },
+                                        "traceWriterOptions": {
+                                            "description": "Additional options for the 'trace writer'."
+                                        },
+                                        "to": {
+                                            "description": "One or more target addresses or ports.",
+                                            "type": "array",
+                                            "oneOf": [
+                                                {
+                                                    "description": "The target port.",
+                                                    "type": "number"    
+                                                },
+                                                {
+                                                    "description": "The target address.",
+                                                    "type": "string"    
+                                                }
+                                            ]
+                                        },
+                                        "writeToOutput": {
+                                            "description": "Write trace entries to output or not.",
+                                            "type": "boolean",
+                                            "default": true
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "writeToOutput": {
+                            "description": "Default value for writing trace entries to output or not.",
+                            "type": "boolean",
+                            "default": true
+                        }
+                    }
+                }
+            }
+        }
     },
     "icon": "icon.png",
     "author": {
@@ -59,6 +156,7 @@
         "@types/mocha": "^2.2.32"
     },
     "dependencies": {
+        "hexy": "^0.2.10",
         "moment": "^2.18.1"
     }
 }

@@ -32,16 +32,6 @@ interface ProxyEntryWithPort {
     readonly port: number;
 }
 
-function getProxyName(name: string, port: number, nr: number) {
-    name = vsp_helpers.toStringSafe(name).trim();
-    if ('' === name) {
-        const SOURCE_PORT = vsp_helpers.getPortSafe(port, 8081);
-
-        name = `Proxy #${nr} - ${SOURCE_PORT}`;
-    }
-
-    return name;
-}
 
 /**
  * The extension controller.
@@ -210,10 +200,12 @@ export class Controller implements vscode.Disposable {
         for (let i = 0; i < ENTRIES.length; i++) {
             const E = ENTRIES[i];
 
-            const NEW_PROXY = new vsp_proxy.TcpProxy(E.port, E.entry);
+            const NEW_PROXY = new vsp_proxy.TcpProxy(this,
+                                                     E.port,
+                                                     E.entry, i);
             this._PROXIES.push(NEW_PROXY);
 
-            const PROXY_NAME = getProxyName(E.entry.name, E.port, i + 1);
+            const PROXY_NAME = vsp_helpers.getProxyName(E.entry.name, E.port, i + 1);
 
             if (vsp_helpers.toBooleanSafe(NEW_PROXY.entry.autoStart)) {
                 try {
@@ -266,7 +258,7 @@ export class Controller implements vscode.Disposable {
 
             let description = vsp_helpers.toStringSafe(ENTRY.description).trim();
 
-            let name = getProxyName(ENTRY.name, PORT, i + 1);
+            let name = vsp_helpers.getProxyName(ENTRY.name, PORT, i + 1);
 
             if (iconResolver) {
                 const ICON = vsp_helpers.toStringSafe(
@@ -329,7 +321,7 @@ export class Controller implements vscode.Disposable {
                 for (let i = 0; i < proxies.length; i++) {
                     const P = proxies[i];
 
-                    const PROXY_NAME = getProxyName(P.entry.name, P.port, i + 1);
+                    const PROXY_NAME = vsp_helpers.getProxyName(P.entry.name, P.port, i + 1);
                     let errMsg: string;
                     try {
                         if (P.isRunning) {
@@ -377,7 +369,7 @@ export class Controller implements vscode.Disposable {
                 for (let i = 0; i < proxies.length; i++) {
                     const P = proxies[i];
 
-                    const PROXY_NAME = getProxyName(P.entry.name, P.port, i + 1);
+                    const PROXY_NAME = vsp_helpers.getProxyName(P.entry.name, P.port, i + 1);
                     let errMsg: string;
                     try {
                         if (P.isTracing) {

@@ -171,6 +171,24 @@ export function getPortSafe(val: any, defaultPort: number): number {
 }
 
 /**
+ * Gets the name for a proxy.
+ * 
+ * @param {string} name The source string.
+ * @param {number} port The TCP port.
+ * @param {number} nr The number.
+ */
+export function getProxyName(name: string, port: number, nr: number) {
+    name = toStringSafe(name).trim();
+    if ('' === name) {
+        const SOURCE_PORT = getPortSafe(port, 8081);
+
+        name = `Proxy #${nr} - ${SOURCE_PORT}`;
+    }
+
+    return name;
+}
+
+/**
  * Converts a value to a boolean.
  * 
  * @param {any} val The value to convert.
@@ -255,6 +273,32 @@ export function loadModule<TModule>(file: string, useCache: boolean = false): TM
     }
     
     return require(file);
+}
+
+/**
+ * Creates a read-only version of an object.
+ * 
+ * @param {T} baseObj The base object.
+ * 
+ * @return {T} The read-only version.
+ */
+export function toReadOnlyObject<T = any>(baseObj: T): T {
+    if (!baseObj) {
+        return baseObj;
+    }
+
+    let result: any = {};
+    const APPEND_PROPERTY = (propertyKey: PropertyKey) => {
+        Object.defineProperty(result, propertyKey, {
+            get: () => baseObj[propertyKey],
+        });
+    };
+
+    for (let p in baseObj) {
+        APPEND_PROPERTY(p);
+    }
+
+    return result;
 }
 
 /**

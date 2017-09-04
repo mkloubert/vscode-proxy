@@ -22,10 +22,13 @@
 // DEALINGS IN THE SOFTWARE.
 
 import * as Events from 'events';
+const Hexy = require('hexy');
+import * as Moment from 'moment';
 import * as Net from 'net';
 import * as Stream from 'stream';
 import * as vscode from 'vscode';
 import * as vsp_contracts from './contracts';
+import * as vsp_controller from './controller';
 import * as vsp_helpers from './helpers';
 
 
@@ -39,7 +42,9 @@ interface EntryWithSocket {
  * A TCP proxy.
  */
 export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
+    private readonly _CONTROLLER: vsp_controller.Controller;
     private readonly _ENTRY: vsp_contracts.ProxyEntry;
+    private readonly _INDEX: number;
     private readonly _PORT: number;
     private _server: Net.Server;
     private _trace: vsp_contracts.TraceEntry[];
@@ -47,14 +52,27 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
     /**
      * Initializes a new instance of that class.
      * 
+     * @param {vsp_controller.Controller} controller The underlying controller.
      * @param {number} port The TCP port.
      * @param {vsp_contracts.ProxyEntry} entry The underlying entry.
+     * @param {number} index The zero-based index of that proxy.
      */
-    constructor(port: number, entry: vsp_contracts.ProxyEntry) {
+    constructor(controller: vsp_controller.Controller,
+                port: number,
+                entry: vsp_contracts.ProxyEntry, index: number) {
         super();
 
+        this._CONTROLLER = controller;
         this._PORT = port;
         this._ENTRY = entry;
+        this._INDEX = index;
+    }
+
+    /**
+     * Gets the underlying controller.
+     */
+    public get controller(): vsp_controller.Controller {
+        return this._CONTROLLER;
     }
 
     /** @inheritdoc */
@@ -74,6 +92,13 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
      */
     public get entry(): vsp_contracts.ProxyEntry {
         return this._ENTRY;
+    }
+
+    /**
+     * Gets the zero-based index of that proxy.
+     */
+    public get index(): number {
+        return this._INDEX;
     }
 
     /**
@@ -122,7 +147,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 });
 
                 let receiveChunksFrom: false | number[] = <any>ME.entry.receiveChunksFrom;
-                if (vsp_helpers.isUndefined(receiveChunksFrom)) {
+                if (vsp_helpers.isNullOrUndefined(receiveChunksFrom)) {
                     receiveChunksFrom = [ 0 ];  // default: first target
                 }
                 else {
@@ -137,6 +162,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     receiveChunksFrom = vsp_helpers.distinctArray( receiveChunksFrom );
                 }
 
+                // trace handler
                 let handleTrace: vsp_contracts.TraceHandlerModuleExecutor;
                 let handleTraceOptions = vsp_helpers.cloneObject(
                     this.entry.traceHandlerOptions,
@@ -148,10 +174,29 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     }
                 }
 
+                // chunk handler
+                let handleChunk: vsp_contracts.ChunkHandlerModuleExecutor;
+                let handleChunkOptions = vsp_helpers.cloneObject(
+                    this.entry.chunkHandlerOptions,
+                );
+                if (!vsp_helpers.isEmptyString(this.entry.chunkHandler)) {
+                    const HANDLER_MODULE = vsp_helpers.loadModule<vsp_contracts.ChunkHandlerModule>(this.entry.chunkHandler);
+                    if (HANDLER_MODULE) {
+                        handleChunk = HANDLER_MODULE.handleChunk;
+                    }
+                }
+
+                const WRITE_TO_OUTPUT = vsp_helpers.toBooleanSafe(
+                    ME.entry.writeToOutput,
+                    vsp_helpers.toBooleanSafe(ME.controller.config.writeToOutput, true),
+                );
+
                 const HANDLE_ERROR = (err: any, source?: any) => {
                     if (!err) {
                         return;
                     }
+
+                    //TODO
                 };
 
                 const HANDLE_TRACE_ENTRY = (newEntry: vsp_contracts.TraceEntry) => {
@@ -172,6 +217,47 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                       vsp_helpers.toStringSafe(e));
                     }
 
+                    // write to output
+                    if (ME.isTracing) {
+                        if (WRITE_TO_OUTPUT) {
+                            try {
+                                const PROXY_NAME = vsp_helpers.getProxyName(
+                                    ME.entry.name,
+                                    ME.port,
+                                    ME.index + 1,
+                                );
+
+                                let separator: string;
+                                let left: string;
+                                let right: string;
+                                switch (newEntry.destination) {
+                                    case vsp_contracts.ProxyDestination.ProxyToTarget:
+                                        separator = '=>';
+                                        left = `[${newEntry.sourceIndex}] '${newEntry.source.addr}:${newEntry.source.port}'`;
+                                        right = `[${newEntry.targetIndex}] '${newEntry.target.addr}:${newEntry.target.port}'`;
+                                        break;
+
+                                    case vsp_contracts.ProxyDestination.TargetToProxy:
+                                        separator = '<=';
+                                        right = `[${newEntry.sourceIndex}] '${newEntry.source.addr}:${newEntry.source.port}'`;
+                                        left = `[${newEntry.targetIndex}] '${newEntry.target.addr}:${newEntry.target.port}'`;
+                                        break;
+                                }
+
+                                ME.controller.outputChannel
+                                             .appendLine(`[TRACE] '${PROXY_NAME}': ${left} ${separator} ${right}`);
+                                if (newEntry.chunk) {
+                                    ME.controller.outputChannel
+                                                 .appendLine( Hexy.hexy(newEntry.chunk, { width: 16 }) );    
+                                }
+                            }
+                            catch (e) {
+                                console.trace('[Proxy] proxy.TcpProxy.start(write to output): ' +
+                                              vsp_helpers.toStringSafe(e));
+                            }
+                        }
+                    }
+
                     // trace handler
                     if (handleTrace) {
                         const ARGS: vsp_contracts.TraceHandlerModuleExecutorArguments = {
@@ -188,20 +274,13 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     let newCunk = chunk;
 
                     // chunk handler
-                    if (!vsp_helpers.isEmptyString(this.entry.chunkHandler)) {
+                    if (handleChunk) {
                         const ARGS: vsp_contracts.ChunkHandlerModuleExecutorArguments = {
                             chunk: chunk,
                             options: vsp_helpers.cloneObject(this.entry.chunkHandlerOptions),
                         };
         
-                        const HANDLER_MODULE = vsp_helpers.loadModule<vsp_contracts.ChunkHandlerModule>(this.entry.chunkHandler);
-                        if (HANDLER_MODULE) {
-                            const HANDLE_CHUNK = HANDLER_MODULE.handleChunk;
-                            if (HANDLE_CHUNK) {
-                                HANDLE_CHUNK.apply(HANDLER_MODULE, 
-                                                   [ ARGS ]);
-                            }
-                        }
+                        handleChunk(ARGS);
 
                         newCunk = ARGS.chunk;
                     }
@@ -241,13 +320,15 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
                             TO.on('data', function(chunk) {
                                 try {
-                                    let SOURCE: vsp_contracts.SocketAddress = {
-                                        addr: TO.localAddress,
-                                        port: TO.localPort,
+                                    const NOW = Moment();
+
+                                    const SOURCE_ADDR: vsp_contracts.SocketAddress = {
+                                        addr: TO.remoteAddress,
+                                        port: TO.remotePort,
                                     };
-                                    let TARGET: vsp_contracts.SocketAddress = {
-                                        addr: from.localAddress,
-                                        port: from.localPort,
+                                    const TARGET_ADDR: vsp_contracts.SocketAddress = {
+                                        addr: from.remoteAddress,
+                                        port: from.remotePort,
                                     };
 
                                     chunk = HANDLE_CHUNK(
@@ -255,25 +336,39 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                     );
 
                                     let err: any;
-                                    if (chunk && chunk.length > 0) {
-                                        if (false !== receiveChunksFrom) {
-                                            if (receiveChunksFrom.indexOf(i) > -1) {
-                                                try {
-                                                    from.write(chunk);  // send "answer"
-                                                }
-                                                catch (e) {
-                                                    e = err;
-                                                }
+                                    let chunkSend = false;
+                                    if (chunk) {
+                                        let sendBack = false;
+
+                                        if (!Array.isArray(receiveChunksFrom)) {
+                                            sendBack = vsp_helpers.toBooleanSafe(receiveChunksFrom);
+                                        }
+                                        else {
+                                            sendBack = receiveChunksFrom.indexOf(i) > -1;
+                                        }
+
+                                        if (sendBack) {
+                                            try {
+                                                from.write(chunk);  // send "answer"
+
+                                                chunkSend = true;
+                                            }
+                                            catch (e) {
+                                                e = err;
                                             }
                                         }
                                     }
 
                                     const NEW_TRACE_ENTRY: vsp_contracts.TraceEntry = {
                                         chunk: chunk,
+                                        chunkSend: chunkSend,
                                         destination: vsp_contracts.ProxyDestination.TargetToProxy,
-                                        err: err,
-                                        source: SOURCE,
-                                        target: TARGET,
+                                        error: err,
+                                        source: SOURCE_ADDR,
+                                        sourceIndex: i,
+                                        target: TARGET_ADDR,
+                                        targetIndex: 0,
+                                        time: NOW,
                                     };
 
                                     HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
@@ -290,13 +385,15 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                         from.on('data', async function(chunk) {
                             TOs.forEach((t, index) => {
                                 try {
-                                    let SOURCE: vsp_contracts.SocketAddress = {
-                                        addr: from.localAddress,
-                                        port: from.localPort,
+                                    const NOW = Moment();
+
+                                    const SOURCE_ADDR: vsp_contracts.SocketAddress = {
+                                        addr: from.remoteAddress,
+                                        port: from.remotePort,
                                     };
-                                    let TARGET: vsp_contracts.SocketAddress = {
-                                        addr: t.socket.localAddress,
-                                        port: t.socket.localPort,
+                                    const TARGET_ADDR: vsp_contracts.SocketAddress = {
+                                        addr: t.socket.remoteAddress,
+                                        port: t.socket.remotePort,
                                     };
 
                                     chunk = HANDLE_CHUNK(
@@ -304,9 +401,12 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                     );
 
                                     let err: any;
-                                    if (chunk && chunk.length > 0) {
+                                    let chunkSend = false;
+                                    if (chunk) {
                                         try {
                                             t.socket.write(chunk);  // send "request"
+
+                                            chunkSend = true;
                                         }
                                         catch (e) {
                                             err = e;
@@ -315,10 +415,14 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
                                     const NEW_TRACE_ENTRY: vsp_contracts.TraceEntry = {
                                         chunk: chunk,
+                                        chunkSend: chunkSend,
                                         destination: vsp_contracts.ProxyDestination.ProxyToTarget,
-                                        err: err,
-                                        source: SOURCE,
-                                        target: TARGET,
+                                        error: err,
+                                        source: SOURCE_ADDR,
+                                        sourceIndex: 0,
+                                        target: TARGET_ADDR,
+                                        targetIndex: index,
+                                        time: NOW,
                                     };
 
                                     HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
