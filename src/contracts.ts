@@ -243,6 +243,19 @@ export interface TraceEntry {
      */
     readonly error?: any;
     /**
+     * The session.
+     */
+    readonly session: {
+        /**
+         * The ID.
+         */
+        readonly id: string;
+        /**
+         * The start time.
+         */
+        readonly time: Moment.Moment;
+    };
+    /**
      * The source address.
      */
     readonly source: SocketAddress;

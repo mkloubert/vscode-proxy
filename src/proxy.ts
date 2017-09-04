@@ -21,11 +21,13 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+import * as Enumerable from 'node-enumerable';
 import * as Events from 'events';
 const Hexy = require('hexy');
 import * as Moment from 'moment';
 import * as Net from 'net';
 import * as Stream from 'stream';
+import * as uuid from 'uuid';
 import * as vscode from 'vscode';
 import * as vsp_contracts from './contracts';
 import * as vsp_controller from './controller';
@@ -50,6 +52,19 @@ interface ProxyStatistics {
 
 
 let nextCommandsId = -1;
+
+function getTraceGroup(entry: vsp_contracts.TraceEntry) {
+    if (!entry) {
+        return;
+    }
+
+    const DESTINATION = entry.destination;
+    const SOURCE = `[${entry.sourceIndex}] ${entry.source.addr}:${entry.source.port}`;
+    const TARGET = `[${entry.targetIndex}] ${entry.target.addr}:${entry.target.port}`;
+    const SESSION = `${entry.session.id}\t${entry.session.time.toDate().getTime()}`;
+
+    return `${DESTINATION}\n${SOURCE}\n${TARGET}\n${SESSION}`;
+};
 
 /**
  * A TCP proxy.
@@ -220,6 +235,10 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             return;
         }
 
+        const GROUPED_TRACES = Enumerable.from(ALL_TRACE).groupBy(x => {
+            return getTraceGroup(x);
+        }).toArray();
+
         try {
             const EOL = "\n";
 
@@ -239,6 +258,28 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
                         return '';
                     }).join(EOL + EOL);
+                    break;
+
+                case 'http':
+                    {
+                        let editorContent = Buffer.alloc(0);
+
+                        GROUPED_TRACES.filter(grp => {
+                            return trace.map(t => getTraceGroup(t))
+                                        .indexOf(grp.key) > -1;
+                        }).forEach(grp => {
+                            grp.each(x => {
+                                if (x.chunk) {
+                                    editorContent = Buffer.concat([
+                                        editorContent,
+                                        x.chunk,
+                                    ]);
+                                }
+                            });
+                        });
+
+                        editorText = editorContent.toString('ascii');
+                    }
                     break;
 
                 case 'json':
@@ -511,6 +552,11 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
                 newServer = Net.createServer((from) => {
                     try {
+                        const SESSION = {
+                            id: uuid.v4(),
+                            time: Moment.utc(),
+                        };
+
                         from.on('error', (err) => {
                             HANDLE_ERROR(err, from);
                         });
@@ -539,7 +585,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
                             TO.on('data', function(chunk) {
                                 try {
-                                    const NOW = Moment();
+                                    const NOW = Moment.utc();
 
                                     const SOURCE_ADDR: vsp_contracts.SocketAddress = {
                                         addr: TO.remoteAddress,
@@ -586,6 +632,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                         chunkSend: chunkSend,
                                         destination: vsp_contracts.ProxyDestination.TargetToProxy,
                                         error: err,
+                                        session: SESSION,
                                         source: SOURCE_ADDR,
                                         sourceIndex: i,
                                         target: TARGET_ADDR,
@@ -611,7 +658,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                         from.on('data', async function(chunk) {
                             TOs.forEach((t, index) => {
                                 try {
-                                    const NOW = Moment();
+                                    const NOW = Moment.utc();
 
                                     const SOURCE_ADDR: vsp_contracts.SocketAddress = {
                                         addr: from.remoteAddress,
@@ -647,6 +694,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                         chunkSend: chunkSend,
                                         destination: vsp_contracts.ProxyDestination.ProxyToTarget,
                                         error: err,
+                                        session: SESSION,
                                         source: SOURCE_ADDR,
                                         sourceIndex: 0,
                                         target: TARGET_ADDR,
