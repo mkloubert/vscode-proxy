@@ -55,6 +55,8 @@ The following example registers a proxy at port `80` and sends all data to `8080
     "proxy": {
         "80": {
             "autoStart": true,
+            "name": "My HTTP proxy",
+            "description": "A proxy for my HTTP server",
             "to": 8080,
             "outputFormat": "http"
         }
