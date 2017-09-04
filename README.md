@@ -7,11 +7,13 @@ Runs TCP proxies with additional trace support in [Visual Studio Code](https://c
 ## Table of contents
 
 1. [Install](#install-)
-2. [How to use](#how-to-use-)
+2. [Demos](#demos-)
+   * [Tracing](#tracing-)
+3. [How to use](#how-to-use-)
    * [Settings](#settings-)
      * [Proxies](#proxies-)
    * [Commands](#commands-)
-3. [Documentation](#documentation-)
+4. [Documentation](#documentation-)
 
 ## Install [[&uarr;](#table-of-contents)]
 
@@ -22,6 +24,12 @@ ext install vscode-proxy
 ```
 
 Or search for things like `vscode-proxy` in your editor.
+
+## Demos
+
+### Tracing
+
+![Demo Tracing](https://raw.githubusercontent.com/mkloubert/vscode-proxy/master/img/demo1.gif)
 
 ## How to use [[&uarr;](#table-of-contents)]
 

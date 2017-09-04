@@ -1013,8 +1013,6 @@ ${toSocketAddressPipeString(LAST_RECEIVE)}
 ${LAST_RECEIVE.chunk ? FileSize(LAST_RECEIVE.chunk.length) : '---'}
 `;
             }
-
-            text += ` (S: ${STATS.chunksSend} (${FileSize(STATS.bytesSend)}); R: ${STATS.chunksReceived} (${FileSize(STATS.bytesReceived)}))`;
         }
 
         text = text.trim();
