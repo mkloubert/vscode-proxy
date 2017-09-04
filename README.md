@@ -1,5 +1,9 @@
 # vscode-proxy
 
+[![Latest Release](https://vsmarketplacebadge.apphb.com/version-short/mkloubert.vscode-proxy.svg)](https://marketplace.visualstudio.com/items?itemName=mkloubert.vscode-proxy)
+[![Installs](https://vsmarketplacebadge.apphb.com/installs/mkloubert.vscode-proxy.svg)](https://marketplace.visualstudio.com/items?itemName=mkloubert.vscode-proxy)
+[![Rating](https://vsmarketplacebadge.apphb.com/rating-short/mkloubert.vscode-proxy.svg)](https://marketplace.visualstudio.com/items?itemName=mkloubert.vscode-proxy#review-details)
+
 Runs TCP proxies with additional trace support in [Visual Studio Code](https://code.visualstudio.com/).
 
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=GJJDLPTHEA4BC)
