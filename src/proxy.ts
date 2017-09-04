@@ -67,6 +67,27 @@ function getTraceGroup(entry: vsp_contracts.TraceEntry) {
     return `${DESTINATION}\n${SOURCE}\n${TARGET}\n${SESSION}`;
 };
 
+function toSocketAddressPipeString(entry: vsp_contracts.TraceEntry) {
+    let separator: string;
+    let left: string;
+    let right: string;
+    switch (entry.destination) {
+        case vsp_contracts.ProxyDestination.ProxyToTarget:
+            separator = '=>';
+            left = `[${entry.sourceIndex}] '${entry.source.addr}:${entry.source.port}'`;
+            right = `[${entry.targetIndex}] '${entry.target.addr}:${entry.target.port}'`;
+            break;
+
+        case vsp_contracts.ProxyDestination.TargetToProxy:
+            separator = '<=';
+            right = `[${entry.sourceIndex}] '${entry.source.addr}:${entry.source.port}'`;
+            left = `[${entry.targetIndex}] '${entry.target.addr}:${entry.target.port}'`;
+            break;
+    }
+
+    return `${left} ${separator} ${right}`;
+}
+
 /**
  * A TCP proxy.
  */
@@ -247,9 +268,11 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             return;
         }
 
-        const GROUPED_TRACES = Enumerable.from(ALL_TRACE).groupBy(x => {
-            return getTraceGroup(x);
-        }).toArray();
+        const GET_GROUPED_TASKS = () => {
+            return Enumerable.from(ALL_TRACE).groupBy(x => {
+                return getTraceGroup(x);
+            });
+        };
 
         try {
             const EOL = "\n";
@@ -258,9 +281,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             if ('' === outputFormat) {
                 outputFormat = vsp_helpers.normalizeString(ME.controller.config.outputFormat);
             }
-            
+
             let editorText: string;
-            let lang = '';
+            let lang = 'plaintext';
             switch (outputFormat) {
                 case 'ascii':
                     editorText = trace.map(te => {
@@ -276,7 +299,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     {
                         let editorContent = Buffer.alloc(0);
 
-                        GROUPED_TRACES.filter(grp => {
+                        GET_GROUPED_TASKS().where(grp => {
                             return trace.map(t => getTraceGroup(t))
                                         .indexOf(grp.key) > -1;
                         }).forEach(grp => {
@@ -316,7 +339,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
         }
         catch (e) {
             console.trace('[Proxy] controller.openTraceInNewTab(): ' +
-                            vsp_helpers.toStringSafe(e));
+                          vsp_helpers.toStringSafe(e));
         }
     }
 
@@ -503,7 +526,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                         return;
                     }
 
-                    //TODO
+                    console.trace(`[Proxy] TcpProxy.start(HANDLE_ERROR): ${vsp_helpers.toStringSafe(err)}`);
                 };
 
                 const HANDLE_TRACE_ENTRY = (newEntry: vsp_contracts.TraceEntry) => {
@@ -619,7 +642,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                             HANDLE_ERROR(err, from);
                         });
 
-                        const TOs: EntryWithSocket[] = [];
+                        const ENTRIES_AND_SOCKETS: EntryWithSocket[] = [];
                         TARGETS.forEach((te, i) => {
                             const TO = Net.createConnection({
                                 host: te.host,
@@ -630,8 +653,6 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                 entry: te,
                                 socket: TO,
                             };
-
-                            TOs.push(NEW_TO);
 
                             TO.on('error', (err) => {
                                 HANDLE_ERROR(err, TO);
@@ -644,15 +665,6 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                             TO.on('data', function(chunk) {
                                 try {
                                     const NOW = Moment.utc();
-
-                                    const SOURCE_ADDR: vsp_contracts.SocketAddress = {
-                                        addr: TO.remoteAddress,
-                                        port: TO.remotePort,
-                                    };
-                                    const TARGET_ADDR: vsp_contracts.SocketAddress = {
-                                        addr: from.remoteAddress,
-                                        port: from.remotePort,
-                                    };
 
                                     chunk = HANDLE_CHUNK(
                                         chunk
@@ -685,6 +697,15 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                         }
                                     }
 
+                                    const SOURCE_ADDR: vsp_contracts.SocketAddress = {
+                                        addr: TO.remoteAddress,
+                                        port: TO.remotePort,
+                                    };
+                                    const TARGET_ADDR: vsp_contracts.SocketAddress = {
+                                        addr: from.remoteAddress,
+                                        port: from.remotePort,
+                                    };
+
                                     const NEW_TRACE_ENTRY: vsp_contracts.TraceEntry = {
                                         chunk: chunk,
                                         chunkSend: chunkSend,
@@ -711,21 +732,18 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                     HANDLE_ERROR(e, from);
                                 }
                             });
+
+                            ENTRIES_AND_SOCKETS.push(NEW_TO);
+                        });
+
+                        from.once('end', () => {
+                            from.end();
                         });
 
                         from.on('data', async function(chunk) {
-                            TOs.forEach((t, index) => {
+                            ENTRIES_AND_SOCKETS.forEach((t, index) => {
                                 try {
                                     const NOW = Moment.utc();
-
-                                    const SOURCE_ADDR: vsp_contracts.SocketAddress = {
-                                        addr: from.remoteAddress,
-                                        port: from.remotePort,
-                                    };
-                                    const TARGET_ADDR: vsp_contracts.SocketAddress = {
-                                        addr: t.socket.remoteAddress,
-                                        port: t.socket.remotePort,
-                                    };
 
                                     chunk = HANDLE_CHUNK(
                                         chunk
@@ -746,6 +764,15 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                             err = e;
                                         }
                                     }
+                                    
+                                    const SOURCE_ADDR: vsp_contracts.SocketAddress = {
+                                        addr: from.remoteAddress,
+                                        port: from.remotePort,
+                                    };
+                                    const TARGET_ADDR: vsp_contracts.SocketAddress = {
+                                        addr: t.socket.remoteAddress,
+                                        port: t.socket.remotePort,
+                                    };
 
                                     const NEW_TRACE_ENTRY: vsp_contracts.TraceEntry = {
                                         chunk: chunk,
@@ -773,10 +800,6 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                     HANDLE_ERROR(e, t.socket);
                                 }
                             });
-                        });
-
-                        from.once('end', () => {
-                            from.end();
                         });
                     }
                     catch (e) {
@@ -874,24 +897,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
         };
 
         if (entry) {
-            let separator: string;
-            let left: string;
-            let right: string;
-            switch (entry.destination) {
-                case vsp_contracts.ProxyDestination.ProxyToTarget:
-                    separator = '=>';
-                    left = `[${entry.sourceIndex}] '${entry.source.addr}:${entry.source.port}'`;
-                    right = `[${entry.targetIndex}] '${entry.target.addr}:${entry.target.port}'`;
-                    break;
-
-                case vsp_contracts.ProxyDestination.TargetToProxy:
-                    separator = '<=';
-                    right = `[${entry.sourceIndex}] '${entry.source.addr}:${entry.source.port}'`;
-                    left = `[${entry.targetIndex}] '${entry.target.addr}:${entry.target.port}'`;
-                    break;
-            }
-
-            APPEND_LINE(`[TRACE] '${ME.name}': ${left} ${separator} ${right}`);
+            APPEND_LINE(`[TRACE] '${ME.name}': ${toSocketAddressPipeString(entry)}`);
             if (entry.chunk) {
                 APPEND_LINE( Hexy.hexy(entry.chunk, { width: hexWidth }) );    
             }
@@ -975,15 +981,37 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
         let color = this.defaultButtonColor;
 
-        let tooltip: string;
+        let tooltip = '';
 
         const STATS = this._statistics;
         if (STATS) {
-            tooltip = `Send: ${STATS.chunksSend} chunk(s) / ${STATS.bytesSend} byte(s)
-Received: ${STATS.chunksReceived} chunk(s) / ${STATS.bytesReceived} byte(s)`;
+            tooltip += `Send: ${STATS.chunksSend} chunk(s) / ${STATS.bytesSend} byte(s)
+Received: ${STATS.chunksReceived} chunk(s) / ${STATS.bytesReceived} byte(s)
+`;
+
+            const LAST_SEND = STATS.lastChunks.send;
+            if (LAST_SEND) {
+                tooltip += `
+Last send: ${LAST_SEND.time.format('YYYY-MM-DD HH:mm:ss.SSS')}
+${toSocketAddressPipeString(LAST_SEND)}
+${LAST_SEND.chunk ? FileSize(LAST_SEND.chunk.length) : '---'}
+`;
+            }
+
+            const LAST_RECEIVE = STATS.lastChunks.received;
+            if (LAST_RECEIVE) {
+                tooltip += `
+Last receive: ${LAST_RECEIVE.time.format('YYYY-MM-DD HH:mm:ss.SSS')}
+${toSocketAddressPipeString(LAST_RECEIVE)}
+${LAST_RECEIVE.chunk ? FileSize(LAST_RECEIVE.chunk.length) : '---'}
+`;
+            }
 
             text += ` (S: ${STATS.chunksSend} (${FileSize(STATS.bytesSend)}); R: ${STATS.chunksReceived} (${FileSize(STATS.bytesReceived)}))`;
         }
+
+        text = text.trim();
+        tooltip = tooltip.trim();
 
         if (BTN.text !== text) {
             BTN.text = text;

@@ -29,11 +29,11 @@ Or search for things like `vscode-proxy` in your editor.
 
 Open (or create) your `settings.json` in your `.vscode` subfolder of your workspace.
 
-Add a `proxy` section:
+Add a `tcp.proxy` section:
 
 ```json
 {
-    "proxy": {
+    "tcp.proxy": {
     }
 }
 ```
@@ -52,7 +52,7 @@ The following example registers a proxy at port `80` and sends all data to `8080
 
 ```json
 {
-    "proxy": {
+    "tcp.proxies": {
         "80": {
             "autoStart": true,
             "name": "My HTTP proxy",

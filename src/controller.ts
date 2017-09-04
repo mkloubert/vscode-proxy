@@ -176,7 +176,7 @@ export class Controller implements vscode.Disposable {
      * Reloads the configuration.
      */
     protected reloadConfiguration() {
-        this._config = vscode.workspace.getConfiguration("proxy") || <any>{};
+        this._config = vscode.workspace.getConfiguration("tcp.proxy") || <any>{};
 
         this.reloadProxies().then(() => {
         }).catch((err) => {
