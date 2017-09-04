@@ -41,7 +41,7 @@ Add a `proxy` section:
 | ---- | --------- |
 | `hexWidth` | The width for binary data in hex view. Default: `16` |
 | `openAfterTrace` | Default value that indicates if traces should be opened in new tab after trace has been finished or not. Default: `(true)` |
-| `outputFormat` | Default output format for traces. Possible values are `ascii`,`http`,`json` and `text`. Default: `text` |
+| `outputFormat` | Default output format for traces. Possible values are `ascii`, `http`, `json` and `text`. Default: `text` |
 | `proxies` | One or more [proxies](#proxies-) to register. |
 | `writeToOutput` | Default value for writing trace entries to output or not. Default: `(false)` |
 
@@ -67,7 +67,7 @@ Add a `proxy` section:
 | `description` | An additional description for the proxy. |
 | `name` | The name of the proxy. |
 | `openAfterTrace` | Open traces in new tab after trace has been finished or not. Default: `(true)` |
-| `outputFormat` | Output format for traces. Possible values are `ascii`,`http`,`json` and `text`. Default: `text` |
+| `outputFormat` | Output format for traces. Possible values are `ascii`, `http`, `json` and `text`. Default: `text` |
 | `receiveChunksFrom` | The custom list of targets (s. 'to') from where to send answers back to the source / client or (true) or (false) to enable/disable that feature. Default: First target. |
 | `traceHandler` | The path to [the script](#trace-handlers-) that handles a (new) trace entry. |
 | `traceHandlerOptions` | Additional options for the [trace handler](#trace-handlers-). |
