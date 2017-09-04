@@ -2,7 +2,7 @@
     "name": "vscode-proxy",
     "displayName": "Proxy",
     "description": "Runs TCP proxies with additional trace support.",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "publisher": "mkloubert",
     "engines": {
         "vscode": "^1.13.0"
@@ -40,6 +40,9 @@
                 "proxy": {
                     "type": "object",
                     "properties": {
+                        "globals": {
+                            "description": "Global options / data."
+                        },
                         "hexWidth": {
                             "description": "The width for binary data in hex view.",
                             "type": "integer",
@@ -67,7 +70,7 @@
                             "type": "object",
                             "patternProperties": {
                                 "\\d+": {
-                                    "description": "A proxy entry",
+                                    "description": "The TCP port of the proxy.",
                                     "type": "object",
                                     "properties": {
                                         "autoStart": {
@@ -136,9 +139,7 @@
                                             "description": "Additional options for the 'trace writer'."
                                         },
                                         "to": {
-                                            "description": "One or more target addresses or ports.",
-                                            "type": "array",
-                                            "oneOf": [
+                                            "oneOf":[
                                                 {
                                                     "description": "The target port.",
                                                     "type": "integer",
@@ -148,6 +149,22 @@
                                                 {
                                                     "description": "The target address.",
                                                     "type": "string"
+                                                },
+                                                {
+                                                    "description": "One or more target addresses or ports.",
+                                                    "type": "array",
+                                                    "oneOf": [
+                                                        {
+                                                            "description": "The target port.",
+                                                            "type": "integer",
+                                                            "minimum": 0,
+                                                            "maximum": 65535
+                                                        },
+                                                        {
+                                                            "description": "The target address.",
+                                                            "type": "string"
+                                                        }
+                                                    ]
                                                 }
                                             ]
                                         },

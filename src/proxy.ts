@@ -470,6 +470,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     vsp_helpers.toBooleanSafe(ME.controller.config.writeToOutput),
                 );
 
+                const GLOBALS = vsp_helpers.cloneObject(this.controller.config.globals);
+
                 const HANDLE_ERROR = (err: any, source?: any) => {
                     if (!err) {
                         return;
@@ -515,6 +517,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     if (handleTrace) {
                         const ARGS: vsp_contracts.TraceHandlerModuleExecutorArguments = {
                             entry: newEntry,
+                            globals: GLOBALS,
                             options: handleTraceOptions,
                             trace: TRACE,
                         };
@@ -530,7 +533,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     if (handleChunk) {
                         const ARGS: vsp_contracts.ChunkHandlerModuleExecutorArguments = {
                             chunk: chunk,
-                            options: vsp_helpers.cloneObject(this.entry.chunkHandlerOptions),
+                            globals: GLOBALS,
+                            options: handleChunkOptions,
                         };
         
                         handleChunk(ARGS);
@@ -849,6 +853,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
             if (!vsp_helpers.isEmptyString(this.entry.traceWriter)) {
                 const ARGS: vsp_contracts.TraceWriterModuleExecutorArguments = {
+                    globals: vsp_helpers.cloneObject(
+                        this.controller.config.globals
+                    ),
                     options: vsp_helpers.cloneObject(
                         this.entry.traceWriterOptions,
                     ),

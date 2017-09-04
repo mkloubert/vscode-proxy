@@ -77,6 +77,10 @@ export interface ChunkHandlerModuleExecutorArguments extends ScriptArguments {
  */
 export interface Configuration extends vscode.WorkspaceConfiguration {
     /**
+     * Global options / data.
+     */
+    readonly globals?: any;
+    /**
      * The width for binary data in hex view.
      */
     readonly hexWidth?: number;
@@ -202,6 +206,10 @@ export type ProxyTarget = string | number;
  * Script arguments.
  */
 export interface ScriptArguments {
+    /**
+     * Global options / data from the settings.
+     */
+    readonly globals: any;
     /**
      * Additional options for the script.
      */
