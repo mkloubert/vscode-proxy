@@ -11,6 +11,7 @@ Runs TCP proxies with additional trace support in [Visual Studio Code](https://c
    * [Settings](#settings-)
      * [Proxies](#proxies-)
    * [Commands](#commands-)
+3. [Documentation](#documentation-)
 
 ## Install [[&uarr;](#table-of-contents)]
 
@@ -80,25 +81,32 @@ Add a `proxy` section:
 
 ```javascript
 exports.handleChunk = function(args) {
-
+    // this function is executed synchronous
 };
 ```
+
+`args` uses the [ChunkHandlerModuleExecutorArguments](https://mkloubert.github.io/vscode-proxy/interfaces/_contracts_.chunkhandlermoduleexecutorarguments.html) interface.
 
 ##### Trace handlers [[&uarr;](#proxies-)]
 
 ```javascript
 exports.handleTrace = function(args) {
-
+    // this function is executed synchronous
 };
 ```
+
+`args` uses the [TraceHandlerModuleExecutorArguments](https://mkloubert.github.io/vscode-proxy/interfaces/_contracts_.tracehandlermoduleexecutorarguments.html) interface.
 
 ##### Trace writers [[&uarr;](#proxies-)]
 
 ```javascript
 exports.writeTrace = function(args) {
-
+    // this function can be executed asynchronous
+    // via a promise
 };
 ```
+
+`args` uses the [TraceWriterModuleExecutorArguments](https://mkloubert.github.io/vscode-proxy/interfaces/_contracts_.tracewritermoduleexecutorarguments.html) interface.
 
 ### Commands [[&uarr;](#how-to-use-)]
 
@@ -108,3 +116,7 @@ Press `F1` to open the list of commands and enter one of the following commands:
 | ---- | --------- | --------- | 
 | `Proxy: Start / stop` | Starts or stops one or more proxies. | `extension.proxy.startStop` | 
 | `Proxy: Trace` | Starts or stops tracing one or more proxies. | `extension.proxy.trace` | 
+
+## Documentation [[&uarr;](#table-of-contents)]
+
+The full API documentation can be found [here](https://mkloubert.github.io/vscode-proxy/).
