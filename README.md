@@ -84,6 +84,11 @@ The following example registers a proxy at port `80` and sends all data to `8080
 ```javascript
 exports.handleChunk = function(args) {
     // this function is executed synchronous
+
+    // you can update `args.chunk` property with new
+    // data, which should be send to the target
+    // 
+    // (undefined) or (null) will NOT send data to the target
 };
 ```
 
