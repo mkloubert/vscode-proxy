@@ -570,15 +570,13 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     }
 
                     // append to trace
-                    if (appendToTrace) {
+                    if (appendToTrace && TRACE) {
                         try {
-                            if (TRACE) {
-                                TRACE.push(newEntry);
-                            }
+                            TRACE.push(newEntry);
                         }
                         catch (e) {
                             console.trace('[Proxy] proxy.TcpProxy.start(append trace): ' +
-                                        vsp_helpers.toStringSafe(e));
+                                          vsp_helpers.toStringSafe(e));
                         }
                     }
 
