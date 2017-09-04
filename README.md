@@ -52,7 +52,7 @@ Add a `proxy` section:
     "proxy": {
         "8081": {
             "autoStart": true,
-            "to": 8081,
+            "to": 8080,
             "outputFormat": "http"
         }
     }
