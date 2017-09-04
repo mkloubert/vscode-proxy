@@ -40,6 +40,12 @@ interface EntryWithSocket {
 interface ProxyStatistics {
     bytesReceived: number;
     bytesSend: number;
+    chunksReceived: number;
+    chunksSend: number;
+    lastChunks: {
+        received?: vsp_contracts.TraceEntry;
+        send?: vsp_contracts.TraceEntry;
+    };
 }
 
 
@@ -139,7 +145,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
             ME._button = vscode.window.createStatusBarItem();
             ME._button.command = CMD;
-            ME._button.show();
+            
+            ME._button.hide();
 
             ME.updateButton();
         }
@@ -224,6 +231,16 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             let editorText: string;
             let lang = '';
             switch (outputFormat) {
+                case 'ascii':
+                    editorText = trace.map(te => {
+                        if (te.chunk) {
+                            return te.chunk.toString('ascii');
+                        }
+
+                        return '';
+                    }).join(EOL + EOL);
+                    break;
+
                 case 'json':
                     editorText = JSON.stringify(trace, null, 2);
                     lang = 'json';
@@ -278,7 +295,18 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     }).forEach(x => {
                         let traceDescription: string;
 
-                        let traceLabel = `[${x.index + 1}] ${x.entry.time.format('YYYY-MM-DD HH:mm:ss.SSS')}`;
+                        let icon: string;
+                        switch (x.entry.destination) {
+                            case vsp_contracts.ProxyDestination.ProxyToTarget:
+                                icon = 'arrow-up';
+                                break;
+
+                            case vsp_contracts.ProxyDestination.TargetToProxy:
+                                icon = 'arrow-down';
+                                break;
+                        }
+
+                        let traceLabel = `$(${icon})  [${x.index + 1}] ${x.entry.time.format('YYYY-MM-DD HH:mm:ss.SSS')}`;
 
                         QUICK_PICKS.push({
                             description: traceDescription,
@@ -476,6 +504,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                 const NEW_STATS: ProxyStatistics = {
                     bytesReceived: 0,
                     bytesSend: 0,
+                    chunksReceived: 0,
+                    chunksSend: 0,
+                    lastChunks: {},
                 };
 
                 newServer = Net.createServer((from) => {
@@ -542,7 +573,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                                 chunkSend = true;
 
                                                 NEW_STATS.bytesReceived += chunk.length;
-                                                ME.updateButton();
+                                                ++NEW_STATS.chunksReceived;
                                             }
                                             catch (e) {
                                                 e = err;
@@ -561,6 +592,10 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                         targetIndex: 0,
                                         time: NOW,
                                     };
+
+                                    NEW_STATS.lastChunks.received = NEW_TRACE_ENTRY;
+
+                                    ME.updateButton();
 
                                     HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
 
@@ -600,7 +635,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                             chunkSend = true;
 
                                             NEW_STATS.bytesSend += chunk.length;
-                                            ME.updateButton();
+                                            ++NEW_STATS.chunksSend;
                                         }
                                         catch (e) {
                                             err = e;
@@ -618,6 +653,10 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                         targetIndex: index,
                                         time: NOW,
                                     };
+
+                                    NEW_STATS.lastChunks.send = NEW_TRACE_ENTRY;
+
+                                    ME.updateButton();
 
                                     HANDLE_TRACE_ENTRY(NEW_TRACE_ENTRY);
 
@@ -649,6 +688,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     ME._statistics = NEW_STATS;
                     ME._server = newServer;
 
+                    ME.updateButton();
+                    ME._button.show();
+
                     COMPLETED(null, true);
                 });
             }
@@ -677,6 +719,9 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
             try {
                 OLD_SERVER.close(() => {
+                    ME._button.hide();
+                    ME.updateButton();
+
                     ME._server = null;
 
                     COMPLETED(null, true);
@@ -795,7 +840,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
             return;
         }
 
-        let text = this.name;
+        let text = `$(microscope)  ${this.name}`;
 
         let color: string;
         if (this.isTracing) {
@@ -809,8 +854,8 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
 
         const STATS = this._statistics;
         if (STATS) {
-            tooltip = `Send: ${STATS.bytesSend}
-Received: ${STATS.bytesReceived}`;
+            tooltip = `Send: ${STATS.chunksSend} chunk(s) / ${STATS.bytesSend} byte(s)
+Received: ${STATS.chunksReceived} chunk(s) / ${STATS.bytesReceived} byte(s)`;
         }
 
         if (BTN.text !== text) {
