@@ -48,10 +48,12 @@ Add a `proxy` section:
 
 #### Proxies [[&uarr;](#settings-)]
 
+The following example registers a proxy at port `80` and sends all data to `8080`.
+
 ```json
 {
     "proxy": {
-        "8081": {
+        "80": {
             "autoStart": true,
             "to": 8080,
             "outputFormat": "http"
