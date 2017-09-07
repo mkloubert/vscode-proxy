@@ -70,6 +70,10 @@ export interface ChunkHandlerModuleExecutorArguments extends ScriptArguments {
      * The current (or new chunk) to send.
      */
     chunk: Buffer;
+    /**
+     * The destination.
+     */
+    readonly destination: ProxyDestination;
 }
 
 /**

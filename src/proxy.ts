@@ -596,7 +596,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                     }
                 };
 
-                const HANDLE_CHUNK = (chunk: Buffer) => {
+                const HANDLE_CHUNK = (chunk: Buffer, destination: vsp_contracts.ProxyDestination) => {
                     let newCunk = chunk;
 
                     // chunk handler
@@ -605,6 +605,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                             chunk: chunk,
                             config: CFG,
                             context: ME.controller.context,
+                            destination: destination,
                             globals: GLOBALS,
                             globalState: ME._globalScriptState,
                             options: handleChunkOptions,
@@ -674,7 +675,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                     const NOW = Moment.utc();
 
                                     chunk = HANDLE_CHUNK(
-                                        chunk
+                                        chunk, vsp_contracts.ProxyDestination.TargetToProxy,
                                     );
 
                                     let err: any;
@@ -753,7 +754,7 @@ export class TcpProxy extends Events.EventEmitter implements vscode.Disposable {
                                     const NOW = Moment.utc();
 
                                     chunk = HANDLE_CHUNK(
-                                        chunk
+                                        chunk, vsp_contracts.ProxyDestination.ProxyToTarget
                                     );
 
                                     let err: any;
