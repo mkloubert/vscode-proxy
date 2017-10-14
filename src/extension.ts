@@ -29,6 +29,7 @@ import * as Path from 'path';
 import * as vsp_contracts from './contracts';
 import * as vsp_controller from './controller';
 import * as vsp_helpers from './helpers';
+import * as vsp_workspace from './workspace';
 import * as vscode from 'vscode';
 
 
@@ -68,6 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
         OUTPUT_CHANNEL,
         pkgFile
     );
+    vsp_workspace.resetSelectedWorkspaceFolder();
 
     controller.onActivated();
 }
