@@ -25,7 +25,7 @@ import * as FS from 'fs';
 import * as OS from 'os';
 import * as Path from 'path';
 import * as vscode from 'vscode';
-
+import * as vsp_helpers from './workspace';
 
 /**
  * Describes a simple 'completed' action.
@@ -440,7 +440,7 @@ export function toFullPath(path: string): string {
     }
     if (!Path.isAbsolute(path)) {
         path = Path.join(
-            Path.join(vscode.workspace.rootPath, '.vscode'),
+            Path.join(vsp_helpers.getRootPath(), '.vscode'),
             path,
         );
     }

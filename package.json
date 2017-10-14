@@ -2,10 +2,10 @@
     "name": "vscode-proxy",
     "displayName": "Proxy",
     "description": "Runs TCP proxies with additional trace support.",
-    "version": "0.16.1",
+    "version": "0.17.0",
     "publisher": "mkloubert",
     "engines": {
-        "vscode": "^1.13.0"
+        "vscode": "^1.17.0"
     },
     "license": "MIT",
     "categories": [
