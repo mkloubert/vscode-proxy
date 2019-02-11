@@ -6,6 +6,14 @@
 
 Runs TCP proxies with additional trace support in [Visual Studio Code](https://code.visualstudio.com/).
 
+<br />
+
+**The extension is now marked as DEPRECATED ... it is RECOMMENDED to use [vscode-powertools](https://marketplace.visualstudio.com/items?itemName=ego-digital.vscode-powertools) by [e.GO Digital](https://github.com/egodigital).**
+
+If you have suggestions and other kind of issues for that new extension, feel free to [open an issue here](https://github.com/egodigital/vscode-powertools/issues).
+
+<br />
+
 [![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=GJJDLPTHEA4BC)
 
 ## Table of contents

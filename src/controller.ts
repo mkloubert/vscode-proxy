@@ -188,6 +188,10 @@ export class Controller implements vscode.Disposable {
                               vsp_helpers.toStringSafe(err));
             });
         });
+
+        this.showDeprecatedMessage().then(() => {
+        }).catch(() => {
+        });
     }
 
     /**
@@ -242,6 +246,52 @@ export class Controller implements vscode.Disposable {
                                   vsp_helpers.toStringSafe(err));
                 });
             }
+        }
+    }
+
+    private async showDeprecatedMessage() {
+        const KEY_SHOW_DEPRECATED_MESSAGE = 'vspShowDeprecatedMessage';
+
+        try {
+            this._CONTEXT
+                .globalState
+                .update('vspLastKnownVersion', undefined);
+        } catch { }
+
+        let newShowMessageValue: boolean;
+        try {
+            const SHOW_MESSAGE = vsp_helpers.toBooleanSafe(
+                this._CONTEXT.globalState.get(KEY_SHOW_DEPRECATED_MESSAGE, true),
+                true
+            );
+
+            newShowMessageValue = SHOW_MESSAGE;
+
+            if (SHOW_MESSAGE) {
+                const BTN = await vscode.window.showWarningMessage(
+                    "[vs-script-commands] The extension has been DEPRECATED. You can try out 'vscode-powertools' for the future ...",
+                    "Open 'vscode-powertools'", "Maybe next time", "Do not show again"
+                );
+
+                if ('Maybe next time' === BTN) {
+                    newShowMessageValue = true;
+                } else {
+                    newShowMessageValue = false;
+                }
+
+                if ("Open 'vscode-powertools'" === BTN) {
+                    await vsp_helpers.open('https://marketplace.visualstudio.com/items?itemName=ego-digital.vscode-powertools');
+                }
+            }
+        } catch (e) {
+            console.log(`[ERROR] Controller.showDeprecatedMessage(1): ${vsp_helpers.toStringSafe(e)}`);
+        } finally {
+            try {
+                await this._CONTEXT.globalState.update(
+                    KEY_SHOW_DEPRECATED_MESSAGE,
+                    newShowMessageValue
+                );
+            } catch { }
         }
     }
 
